@@ -1,6 +1,5 @@
 {
     "client_cas": [
-        "/certs/device-manager.crt",
-        "/certs/enroller.crt"
+        "/certs/dms-ca.crt"
     ]
 }
