@@ -40,6 +40,7 @@ type devicesService struct {
 	devicesDb devicesStore.DB
 	logger    log.Logger
 	caClient  *http.Client
+	caUrl string
 }
 
 var (
@@ -56,10 +57,11 @@ var (
 	ErrResponseEncode   = errors.New("error encoding response")
 )
 
-func NewDevicesService(devicesDb devicesStore.DB, caClient *http.Client) Service {
+func NewDevicesService(devicesDb devicesStore.DB, caClient *http.Client, caUrl string) Service {
 	return &devicesService{
 		devicesDb: devicesDb,
 		caClient:  caClient,
+		caUrl: caUrl
 	}
 }
 
@@ -170,7 +172,7 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string) error 
 	// revoke
 	req, err := http.NewRequest(
 		"DELETE",
-		"https://localhost:8087/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
+		s.caUrl + "/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
 		nil,
 	)
 	if err != nil {
@@ -248,7 +250,7 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 
 	req, err := http.NewRequest(
 		"GET",
-		"https://localhost:8087/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
+		s.caUrl + "/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
 		nil,
 	)
 	if err != nil {

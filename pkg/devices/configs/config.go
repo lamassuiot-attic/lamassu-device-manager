@@ -22,7 +22,8 @@ type Config struct {
 	KeycloakRealm    string
 	KeycloakCA       string
 
-	CACertfile string
+	CACertfile   string
+	CAServerAddr string
 
 	CertFile string
 	KeyFile  string

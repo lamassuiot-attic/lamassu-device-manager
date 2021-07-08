@@ -86,10 +86,11 @@ func main() {
 		},
 	}
 	caClient := &http.Client{Transport: tr}
+	caUrl := cfg.CAServerAddr
 
 	var s api.Service
 	{
-		s = api.NewDevicesService(devicesDb, caClient)
+		s = api.NewDevicesService(devicesDb, caClient, caUrl)
 		s = api.LoggingMiddleware(logger)(s)
 		s = api.NewInstrumentingMiddleware(
 			kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
