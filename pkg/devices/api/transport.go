@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/lamassuiot/enroller/pkg/devices/auth"
-	"github.com/lamassuiot/enroller/pkg/devices/models/device"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/auth"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 
 	"github.com/gorilla/mux"
 

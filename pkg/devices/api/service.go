@@ -18,8 +18,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
-	devicesModel "github.com/lamassuiot/enroller/pkg/devices/models/device"
-	devicesStore "github.com/lamassuiot/enroller/pkg/devices/models/device/store"
+	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+	devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
 )
 
 type Service interface {

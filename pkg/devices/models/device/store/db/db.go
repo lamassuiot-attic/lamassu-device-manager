@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lamassuiot/enroller/pkg/devices/models/device"
-	"github.com/lamassuiot/enroller/pkg/devices/models/device/store"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"

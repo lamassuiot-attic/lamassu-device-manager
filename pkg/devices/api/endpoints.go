@@ -3,7 +3,7 @@ package api
 import (
 	"context"
 
-	"github.com/lamassuiot/enroller/pkg/devices/models/device"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/tracing/opentracing"

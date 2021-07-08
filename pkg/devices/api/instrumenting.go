@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	deviceModel "github.com/lamassuiot/enroller/pkg/devices/models/device"
-	devicesModel "github.com/lamassuiot/enroller/pkg/devices/models/device"
+	deviceModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 
 	"github.com/go-kit/kit/metrics"
 )

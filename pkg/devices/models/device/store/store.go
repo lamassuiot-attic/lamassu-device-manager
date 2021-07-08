@@ -1,6 +1,6 @@
 package store
 
-import "github.com/lamassuiot/enroller/pkg/devices/models/device"
+import "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 
 type DB interface {
 	InsertDevice(d device.Device) error

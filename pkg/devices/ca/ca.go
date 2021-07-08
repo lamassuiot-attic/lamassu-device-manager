@@ -14,8 +14,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/lamassuiot/lamassu-est/client/estclient"
 
-	devicesModel "github.com/lamassuiot/enroller/pkg/devices/models/device"
-	devicesStore "github.com/lamassuiot/enroller/pkg/devices/models/device/store"
+	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+	devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
 )
 
 type DeviceService struct {
