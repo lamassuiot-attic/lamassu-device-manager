@@ -40,7 +40,7 @@ type devicesService struct {
 	devicesDb devicesStore.DB
 	logger    log.Logger
 	caClient  *http.Client
-	caUrl string
+	caUrl     string
 }
 
 var (
@@ -61,7 +61,7 @@ func NewDevicesService(devicesDb devicesStore.DB, caClient *http.Client, caUrl s
 	return &devicesService{
 		devicesDb: devicesDb,
 		caClient:  caClient,
-		caUrl: caUrl
+		caUrl:     caUrl,
 	}
 }
 
@@ -172,7 +172,7 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string) error 
 	// revoke
 	req, err := http.NewRequest(
 		"DELETE",
-		s.caUrl + "/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
+		s.caUrl+"/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
 		nil,
 	)
 	if err != nil {
@@ -250,7 +250,7 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 
 	req, err := http.NewRequest(
 		"GET",
-		s.caUrl + "/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
+		s.caUrl+"/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
 		nil,
 	)
 	if err != nil {
