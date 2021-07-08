@@ -1,4 +1,4 @@
-module github.com/lamassuiot/enroller
+module github.com/lamassuiot/lamassu-device-manager
 
 go 1.13
 
