@@ -2,19 +2,20 @@ package main
 
 import (
 	"fmt"
-	"github.com/lamassuiot/enroller/pkg/devices/ca"
-	"github.com/lamassuiot/lamassu-est/server/estserver"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/lamassuiot/enroller/pkg/devices/api"
-	"github.com/lamassuiot/enroller/pkg/devices/auth"
-	"github.com/lamassuiot/enroller/pkg/devices/configs"
-	"github.com/lamassuiot/enroller/pkg/devices/discovery/consul"
-	devicesDb "github.com/lamassuiot/enroller/pkg/devices/models/device/store/db"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/ca"
+	"github.com/lamassuiot/lamassu-est/server/estserver"
+
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/api"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/auth"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/configs"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/discovery/consul"
+	devicesDb "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store/db"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
