@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"crypto/rand"
-	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
@@ -40,6 +39,7 @@ type devicesService struct {
 	mtx       sync.RWMutex
 	devicesDb devicesStore.DB
 	logger    log.Logger
+	caClient  *http.Client
 }
 
 var (
@@ -56,9 +56,10 @@ var (
 	ErrResponseEncode   = errors.New("error encoding response")
 )
 
-func NewDevicesService(devicesDb devicesStore.DB) Service {
+func NewDevicesService(devicesDb devicesStore.DB, caClient *http.Client) Service {
 	return &devicesService{
 		devicesDb: devicesDb,
+		caClient:  caClient,
 	}
 }
 
@@ -167,19 +168,6 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string) error 
 	}
 
 	// revoke
-	certPool := x509.NewCertPool()
-	pem, err := ioutil.ReadFile("/home/ubuntu/Desktop/LAMASSU/lamassu-ca/localhost.crt")
-	if err != nil {
-		return err
-	}
-	certPool.AppendCertsFromPEM(pem)
-
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
-		},
-	}
-	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest(
 		"DELETE",
 		"https://localhost:8087/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
@@ -195,7 +183,7 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string) error 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", reqToken))
 	_ = req.WithContext(ctx)
 
-	_, err = client.Do(req)
+	_, err = s.caClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -258,18 +246,6 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 		return devicesModel.DeviceCert{}, err
 	}
 
-	certPool := x509.NewCertPool()
-	pem, err := ioutil.ReadFile("/home/ubuntu/Desktop/LAMASSU/lamassu-ca/localhost.crt")
-	if err != nil {
-		return devicesModel.DeviceCert{}, err
-	}
-	certPool.AppendCertsFromPEM(pem)
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			RootCAs: certPool,
-		},
-	}
-	client := &http.Client{Transport: tr}
 	req, err := http.NewRequest(
 		"GET",
 		"https://localhost:8087/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
@@ -285,7 +261,7 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", reqToken))
 	_ = req.WithContext(ctx)
 
-	response, err := client.Do(req)
+	response, err := s.caClient.Do(req)
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
 	}

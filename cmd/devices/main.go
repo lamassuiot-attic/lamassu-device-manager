@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"os/signal"
@@ -69,9 +72,24 @@ func main() {
 
 	fieldKeys := []string{"method", "error"}
 
+	caPem, err := ioutil.ReadFile(cfg.CACertfile)
+	if err != nil {
+		level.Error(logger).Log("err", err, "msg", "Could not read CA cert file")
+		os.Exit(1)
+	}
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(caPem)
+
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: certPool,
+		},
+	}
+	caClient := &http.Client{Transport: tr}
+
 	var s api.Service
 	{
-		s = api.NewDevicesService(devicesDb)
+		s = api.NewDevicesService(devicesDb, caClient)
 		s = api.LoggingMiddleware(logger)(s)
 		s = api.NewInstrumentingMiddleware(
 			kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{

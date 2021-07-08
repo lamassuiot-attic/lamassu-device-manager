@@ -131,7 +131,7 @@ func (db *DB) SelectAllDevicesByDmsId(dms_id string) (device.Devices, error) {
 	var devices []device.Device
 	for rows.Next() {
 		var dev device.Device
-		err := rows.Scan(&dev.Id, &dev.Alias, &dev.Status, &dev.DmsId, &dev.Country, &dev.State, &dev.Locality, &dev.Organization, &dev.OrganizationUnit, &dev.CommonName, &dev.KeyStrength, &dev.KeyType, &dev.KeyBits, &dev.CreationTimestamp)
+		err := rows.Scan(&dev.Id, &dev.Alias, &dev.Status, &dev.DmsId, &dev.Country, &dev.State, &dev.Locality, &dev.Organization, &dev.OrganizationUnit, &dev.CommonName, &dev.KeyStrength, &dev.KeyType, &dev.KeyBits, &dev.CreationTimestamp, &dev.CurrentCertSerialNumber)
 		if err != nil {
 			level.Error(db.logger).Log("err", err, "msg", "Unable to read database Device row")
 			return device.Devices{}, err
