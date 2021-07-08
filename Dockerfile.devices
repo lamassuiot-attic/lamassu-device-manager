@@ -8,4 +8,5 @@ RUN CGO_ENABLED=0 go build -o devices ./cmd/devices/main.go
 
 FROM scratch
 COPY --from=0 /app/devices /
+COPY ./est-config.json /certs/clientcas.json
 CMD ["/devices"]
