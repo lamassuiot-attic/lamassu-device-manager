@@ -50,11 +50,11 @@ func (ca *DeviceService) Enroll(ctx context.Context, csr *x509.CertificateReques
 		fmt.Println(err)
 		return nil, errors.New(err)
 	}
-	if device.Status == devicesModel.DeviceProvisioned {
+	/*if device.Status == devicesModel.DeviceProvisioned {
 		err := "The device (" + deviceId + ") already has a valid certificate"
 		fmt.Println(err)
 		return nil, errors.New(err)
-	}
+	}*/
 
 	cert, err := estclient.Enroll(csr, aps)
 	if err != nil {
