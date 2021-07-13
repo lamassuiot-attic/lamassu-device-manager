@@ -5,6 +5,7 @@ data/*
 #####################################################################
 no-git/*
 no-git/**
+no-git/
 no-git
 
 # Binaries for programs and plugins
