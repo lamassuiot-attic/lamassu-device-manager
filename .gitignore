@@ -3,6 +3,7 @@ data/*
 # Go .gitignore                                                     #
 # src: https://github.com/github/gitignore/blob/master/Go.gitignore #
 #####################################################################
+no-git
 
 # Binaries for programs and plugins
 *.exe
