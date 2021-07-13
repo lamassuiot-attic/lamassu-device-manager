@@ -332,7 +332,6 @@ func (db *DB) SelectDeviceCertHistoryLastThirtyDays() (device.DeviceCertsHistory
 	sqlStatement := `
 	SELECT * FROM device_certificates_history WHERE creation_ts >= NOW() - INTERVAL '30 days'
 	`
-	var devCh device.DeviceCertHistory
 	rows, err := db.Query(sqlStatement)
 	if err != nil {
 		level.Error(db.logger).Log("err", err, "msg", "Could not obtain Devices Cert History from database")
