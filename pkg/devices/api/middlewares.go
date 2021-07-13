@@ -150,3 +150,14 @@ func (mw loggingMiddleware) GetDeviceCertHistory(ctx context.Context, id string)
 	}(time.Now())
 	return mw.next.GetDeviceCertHistory(ctx, id)
 }
+func (mw loggingMiddleware) GetDmsCertHistoryThirtyDays(ctx context.Context) (certHisto devicesModel.DMSCertsHistory, err error) {
+	defer func(begin time.Time) {
+		mw.logger.Log(
+			"method", "GetDmsCertHistoryThirtyDays",
+			"histo", certHisto,
+			"took", time.Since(begin),
+			"err", err,
+		)
+	}(time.Now())
+	return mw.next.GetDmsCertHistoryThirtyDays(ctx)
+}

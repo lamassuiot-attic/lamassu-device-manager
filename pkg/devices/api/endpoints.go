@@ -11,16 +11,17 @@ import (
 )
 
 type Endpoints struct {
-	HealthEndpoint       endpoint.Endpoint
-	PostDeviceEndpoint   endpoint.Endpoint
-	GetDevices           endpoint.Endpoint
-	GetDeviceById        endpoint.Endpoint
-	GetDevicesByDMS      endpoint.Endpoint
-	DeleteDevice         endpoint.Endpoint
-	DeleteRevoke         endpoint.Endpoint
-	GetDeviceLogs        endpoint.Endpoint
-	GetDeviceCert        endpoint.Endpoint
-	GetDeviceCertHistory endpoint.Endpoint
+	HealthEndpoint              endpoint.Endpoint
+	PostDeviceEndpoint          endpoint.Endpoint
+	GetDevices                  endpoint.Endpoint
+	GetDeviceById               endpoint.Endpoint
+	GetDevicesByDMS             endpoint.Endpoint
+	DeleteDevice                endpoint.Endpoint
+	DeleteRevoke                endpoint.Endpoint
+	GetDeviceLogs               endpoint.Endpoint
+	GetDeviceCert               endpoint.Endpoint
+	GetDeviceCertHistory        endpoint.Endpoint
+	GetDmsCertHistoryThirtyDays endpoint.Endpoint
 }
 
 func MakeServerEndpoints(s Service, otTracer stdopentracing.Tracer) Endpoints {
@@ -74,18 +75,24 @@ func MakeServerEndpoints(s Service, otTracer stdopentracing.Tracer) Endpoints {
 		getDeviceCertHistoryEndpoint = MakeGetDeviceCertHistoryEndpoint(s)
 		getDeviceCertHistoryEndpoint = opentracing.TraceServer(otTracer, "getDeviceCertHistoryEndpoint")(getDeviceCertHistoryEndpoint)
 	}
+	var getDmsCertHistoryThirtyDaysEndpoint endpoint.Endpoint
+	{
+		getDmsCertHistoryThirtyDaysEndpoint = MakeGetDmsCertHistoryThirtyDaysEndpoint(s)
+		getDmsCertHistoryThirtyDaysEndpoint = opentracing.TraceServer(otTracer, "getDmsCertHistoryThirtyDaysEndpoint")(getDmsCertHistoryThirtyDaysEndpoint)
+	}
 
 	return Endpoints{
-		HealthEndpoint:       healthEndpoint,
-		PostDeviceEndpoint:   postDeviceEndpoint,
-		GetDevices:           getDevicesEndpoint,
-		GetDeviceById:        getDevicesByIdEndpoint,
-		GetDevicesByDMS:      getDevicesByDMSEndpoint,
-		DeleteDevice:         deleteDeviceEndpoint,
-		DeleteRevoke:         deleteRevokeEndpoint,
-		GetDeviceLogs:        getDeviceLogsEndpoint,
-		GetDeviceCert:        getDeviceCertEndpoint,
-		GetDeviceCertHistory: getDeviceCertHistoryEndpoint,
+		HealthEndpoint:              healthEndpoint,
+		PostDeviceEndpoint:          postDeviceEndpoint,
+		GetDevices:                  getDevicesEndpoint,
+		GetDeviceById:               getDevicesByIdEndpoint,
+		GetDevicesByDMS:             getDevicesByDMSEndpoint,
+		DeleteDevice:                deleteDeviceEndpoint,
+		DeleteRevoke:                deleteRevokeEndpoint,
+		GetDeviceLogs:               getDeviceLogsEndpoint,
+		GetDeviceCert:               getDeviceCertEndpoint,
+		GetDeviceCertHistory:        getDeviceCertHistoryEndpoint,
+		GetDmsCertHistoryThirtyDays: getDmsCertHistoryThirtyDaysEndpoint,
 	}
 }
 
@@ -161,6 +168,12 @@ func MakeGetDeviceCertHistoryEndpoint(s Service) endpoint.Endpoint {
 		req := request.(getDeviceCertHistoryRequest)
 		history, e := s.GetDeviceCertHistory(ctx, req.Id)
 		return history.DeviceCertHistory, e
+	}
+}
+func MakeGetDmsCertHistoryThirtyDaysEndpoint(s Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		history, e := s.GetDmsCertHistoryThirtyDays(ctx)
+		return history.DMSCertsHistory, e
 	}
 }
 

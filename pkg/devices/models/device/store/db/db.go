@@ -328,6 +328,32 @@ func (db *DB) SelectDeviceCertHistoryBySerialNumber(serialNumber string) (device
 
 	return devCh, nil
 }
+func (db *DB) SelectDeviceCertHistoryLastThirtyDays() (device.DeviceCertsHistory, error) {
+	sqlStatement := `
+	SELECT * FROM device_certificates_history WHERE creation_ts >= NOW() - INTERVAL '30 days'
+	`
+	var devCh device.DeviceCertHistory
+	rows, err := db.Query(sqlStatement)
+	if err != nil {
+		level.Error(db.logger).Log("err", err, "msg", "Could not obtain Devices Cert History from database")
+		return device.DeviceCertsHistory{}, err
+	}
+	defer rows.Close()
+
+	var deviceCertHistory []device.DeviceCertHistory
+	for rows.Next() {
+		var certHistory device.DeviceCertHistory
+		err := rows.Scan(&certHistory.SerialNumber, &certHistory.DeviceId, &certHistory.IssuerSerialNumber, &certHistory.IsuuerName, &certHistory.Status, &certHistory.CreationTimestamp)
+		if err != nil {
+			level.Error(db.logger).Log("err", err, "msg", "Unable to read database Device row")
+			return device.DeviceCertsHistory{}, err
+		}
+		level.Info(db.logger).Log("msg", "Devices Cert History with SerialNumber "+certHistory.SerialNumber+" read from database")
+		deviceCertHistory = append(deviceCertHistory, certHistory)
+	}
+
+	return device.DeviceCertsHistory{DeviceCertHistory: deviceCertHistory}, nil
+}
 
 func (db *DB) UpdateDeviceCertHistory(deviceId string, serialNumber string, newStatus string) error {
 	sqlStatement := `

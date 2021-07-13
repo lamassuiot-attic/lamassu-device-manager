@@ -17,5 +17,6 @@ type DB interface {
 	InsertDeviceCertHistory(l device.DeviceCertHistory) error
 	SelectDeviceCertHistory(deviceId string) (device.DeviceCertsHistory, error)
 	SelectDeviceCertHistoryBySerialNumber(serialNumber string) (device.DeviceCertHistory, error)
+	SelectDeviceCertHistoryLastThirtyDays() (device.DeviceCertsHistory, error)
 	UpdateDeviceCertHistory(deviceId string, serialNumber string, newStatus string) error
 }

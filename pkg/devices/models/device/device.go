@@ -61,6 +61,13 @@ type DeviceLogs struct {
 type DeviceCertsHistory struct {
 	DeviceCertHistory []DeviceCertHistory `json:"-"`
 }
+type DMSCertHistory struct {
+	DmsId       int `json:"dms_id"`
+	IssuedCerts int `json:"issued_certs"`
+}
+type DMSCertsHistory struct {
+	DMSCertsHistory []DMSCertHistory `json:"-"`
+}
 
 const ( // Device status
 	DevicePendingProvision = "PENDING_PROVISION"

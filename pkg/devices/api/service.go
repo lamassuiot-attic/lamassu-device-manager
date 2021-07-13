@@ -17,6 +17,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 	devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
 )
@@ -33,6 +34,7 @@ type Service interface {
 	GetDeviceLogs(ctx context.Context, id string) (devicesModel.DeviceLogs, error)
 	GetDeviceCert(ctx context.Context, id string) (devicesModel.DeviceCert, error)
 	GetDeviceCertHistory(ctx context.Context, id string) (devicesModel.DeviceCertsHistory, error)
+	GetDmsCertHistoryThirtyDays(ctx context.Context) (devicesModel.DMSCertsHistory, error)
 }
 
 type devicesService struct {
@@ -273,12 +275,10 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 	body, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Could not parse response body")
-
 	}
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Could not parse response json")
-
 	}
 
 	return devicesModel.DeviceCert{
@@ -296,6 +296,49 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 		ValidFrom:    data["valid_from"].(string),
 		ValidTo:      data["valid_to"].(string),
 	}, nil
+}
+
+func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context) (devicesModel.DMSCertsHistory, error) {
+	devices, err := s.devicesDb.SelectAllDevices()
+	if err != nil {
+		level.Error(s.logger).Log("err", err, "msg", "Could not get devices from DB")
+		return devicesModel.DMSCertsHistory{}, err
+	}
+
+	deviceDmsMap := make(map[string]int)
+	for i := 0; i < len(devices.Devices); i++ {
+		dev := devices.Devices[i]
+		deviceDmsMap[dev.Id] = dev.DmsId
+	}
+
+	certHistory, err := s.devicesDb.SelectDeviceCertHistoryLastThirtyDays()
+	if err != nil {
+		level.Error(s.logger).Log("err", err, "msg", "Could not get last 30 days issued certs from DB")
+		return devicesModel.DMSCertsHistory{}, err
+	}
+
+	dmsCertsMap := make(map[int]int) //dmsId -> length
+
+	for i := 0; i < len(certHistory.DeviceCertHistory); i++ {
+		certHistory := certHistory.DeviceCertHistory[i]
+		devId := certHistory.DeviceId
+
+		j := dmsCertsMap[deviceDmsMap[devId]]
+		if j == 0 {
+			// DMS not in map. Add it
+			dmsCertsMap[deviceDmsMap[devId]] = 1
+		} else {
+			dmsCertsMap[deviceDmsMap[devId]] = dmsCertsMap[deviceDmsMap[devId]] + 1
+		}
+	}
+
+	var dmsCerts []device.DMSCertHistory
+	for key, value := range dmsCertsMap {
+		fmt.Println("Key:", key, "Value:", value)
+		dmsCerts = append(dmsCerts, devicesModel.DMSCertHistory{DmsId: key, IssuedCerts: value})
+	}
+
+	return devicesModel.DMSCertsHistory{DMSCertsHistory: dmsCerts}, nil
 }
 
 func getKeyStrength(keyType string, keyBits int) string {

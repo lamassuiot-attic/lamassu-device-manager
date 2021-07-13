@@ -106,6 +106,13 @@ func MakeHTTPHandler(s Service, logger log.Logger, auth auth.Auth, otTracer stdo
 		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceCertHistory", logger)))...,
 	))
 
+	r.Methods("GET").Path("/v1/devices/dms-cert-history/thirty-days").Handler(httptransport.NewServer(
+		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDmsCertHistoryThirtyDays),
+		decodedecodeGetDmsCertHistoryThirtyDaysRequest,
+		encodeResponse,
+		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDmsCertHistoryThirtyDays", logger)))...,
+	))
+
 	return r
 }
 
@@ -188,6 +195,10 @@ func decodedecodeGetDeviceCertHistoryRequest(ctx context.Context, r *http.Reques
 		return nil, ErrInvalidDeviceId
 	}
 	return getDeviceCertHistoryRequest{Id: id}, nil
+}
+func decodedecodeGetDmsCertHistoryThirtyDaysRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var req healthRequest
+	return req, nil
 }
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
