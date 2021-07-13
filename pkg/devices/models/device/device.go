@@ -65,6 +65,14 @@ type DMSCertHistory struct {
 	DmsId       int `json:"dms_id"`
 	IssuedCerts int `json:"issued_certs"`
 }
+type DMSLastIssued struct {
+	DmsId        int    `json:"dms_id"`
+	Timestamp    string `json:"timestamp"`
+	SerialNumber string `json:"serial_number"`
+}
+type DMSsLastIssued struct {
+	DMSLastIssued []DMSLastIssued `json:"-"`
+}
 type DMSCertsHistory struct {
 	DMSCertsHistory []DMSCertHistory `json:"-"`
 }

@@ -130,3 +130,12 @@ func (mw *instrumentingMiddleware) GetDmsCertHistoryThirtyDays(ctx context.Conte
 
 	return mw.next.GetDmsCertHistoryThirtyDays(ctx)
 }
+func (mw *instrumentingMiddleware) GetDmsLastIssuedCert(ctx context.Context) (dmsLastIssued devicesModel.DMSsLastIssued, err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "GetDmsLastIssuedCert", "error", fmt.Sprint(err != nil)}
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+	}(time.Now())
+
+	return mw.next.GetDmsLastIssuedCert(ctx)
+}

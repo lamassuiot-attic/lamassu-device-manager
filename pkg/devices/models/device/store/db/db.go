@@ -378,3 +378,28 @@ func (db *DB) UpdateDeviceCertHistory(deviceId string, serialNumber string, newS
 	level.Error(db.logger).Log("err", err, "msg", "Updated Devices Cert History with ID "+serialNumber+" to "+newStatus+" status")
 	return nil
 }
+
+func (db *DB) SelectDmssLastIssuedCert() (device.DMSsLastIssued, error) {
+	sqlStatement := `
+	SELECT * FROM last_issued_cert_by_dms
+	`
+	rows, err := db.Query(sqlStatement)
+	if err != nil {
+		level.Error(db.logger).Log("err", err, "msg", "Could not obtain Last Issued Cert By DMS from database")
+		return device.DMSsLastIssued{}, err
+	}
+	defer rows.Close()
+
+	var dmssLastIssued []device.DMSLastIssued
+	for rows.Next() {
+		var lastIssued device.DMSLastIssued
+		err := rows.Scan(&lastIssued.SerialNumber, &lastIssued.Timestamp, &lastIssued.SerialNumber)
+		if err != nil {
+			level.Error(db.logger).Log("err", err, "msg", "Unable to read database Device row")
+			return device.DMSsLastIssued{}, err
+		}
+		dmssLastIssued = append(dmssLastIssued, lastIssued)
+	}
+
+	return device.DMSsLastIssued{DMSLastIssued: dmssLastIssued}, nil
+}

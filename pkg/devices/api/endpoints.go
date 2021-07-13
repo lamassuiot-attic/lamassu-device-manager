@@ -22,6 +22,7 @@ type Endpoints struct {
 	GetDeviceCert               endpoint.Endpoint
 	GetDeviceCertHistory        endpoint.Endpoint
 	GetDmsCertHistoryThirtyDays endpoint.Endpoint
+	GetDmsLastIssueCert         endpoint.Endpoint
 }
 
 func MakeServerEndpoints(s Service, otTracer stdopentracing.Tracer) Endpoints {
@@ -80,6 +81,11 @@ func MakeServerEndpoints(s Service, otTracer stdopentracing.Tracer) Endpoints {
 		getDmsCertHistoryThirtyDaysEndpoint = MakeGetDmsCertHistoryThirtyDaysEndpoint(s)
 		getDmsCertHistoryThirtyDaysEndpoint = opentracing.TraceServer(otTracer, "getDmsCertHistoryThirtyDaysEndpoint")(getDmsCertHistoryThirtyDaysEndpoint)
 	}
+	var getDmsLastIssueCertEndpoint endpoint.Endpoint
+	{
+		getDmsLastIssueCertEndpoint = MakeGetDmsLastIssueCertEndpoint(s)
+		getDmsLastIssueCertEndpoint = opentracing.TraceServer(otTracer, "getDmsLastIssueCertEndpoint")(getDmsLastIssueCertEndpoint)
+	}
 
 	return Endpoints{
 		HealthEndpoint:              healthEndpoint,
@@ -93,6 +99,7 @@ func MakeServerEndpoints(s Service, otTracer stdopentracing.Tracer) Endpoints {
 		GetDeviceCert:               getDeviceCertEndpoint,
 		GetDeviceCertHistory:        getDeviceCertHistoryEndpoint,
 		GetDmsCertHistoryThirtyDays: getDmsCertHistoryThirtyDaysEndpoint,
+		GetDmsLastIssueCert:         getDmsLastIssueCertEndpoint,
 	}
 }
 
@@ -174,6 +181,12 @@ func MakeGetDmsCertHistoryThirtyDaysEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		history, e := s.GetDmsCertHistoryThirtyDays(ctx)
 		return history.DMSCertsHistory, e
+	}
+}
+func MakeGetDmsLastIssueCertEndpoint(s Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		history, e := s.GetDmsLastIssuedCert(ctx)
+		return history.DMSLastIssued, e
 	}
 }
 

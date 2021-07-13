@@ -35,6 +35,7 @@ type Service interface {
 	GetDeviceCert(ctx context.Context, id string) (devicesModel.DeviceCert, error)
 	GetDeviceCertHistory(ctx context.Context, id string) (devicesModel.DeviceCertsHistory, error)
 	GetDmsCertHistoryThirtyDays(ctx context.Context) (devicesModel.DMSCertsHistory, error)
+	GetDmsLastIssuedCert(ctx context.Context) (devicesModel.DMSsLastIssued, error)
 }
 
 type devicesService struct {
@@ -334,11 +335,19 @@ func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context) (devic
 
 	var dmsCerts []device.DMSCertHistory
 	for key, value := range dmsCertsMap {
-		fmt.Println("Key:", key, "Value:", value)
 		dmsCerts = append(dmsCerts, devicesModel.DMSCertHistory{DmsId: key, IssuedCerts: value})
 	}
 
 	return devicesModel.DMSCertsHistory{DMSCertsHistory: dmsCerts}, nil
+}
+
+func (s *devicesService) GetDmsLastIssuedCert(ctx context.Context) (devicesModel.DMSsLastIssued, error) {
+	lastIssued, err := s.devicesDb.SelectDmssLastIssuedCert()
+	if err != nil {
+		level.Error(s.logger).Log("err", err, "msg", "Could not get devices from DB")
+		return devicesModel.DMSsLastIssued{}, err
+	}
+	return lastIssued, nil
 }
 
 func getKeyStrength(keyType string, keyBits int) string {

@@ -19,4 +19,6 @@ type DB interface {
 	SelectDeviceCertHistoryBySerialNumber(serialNumber string) (device.DeviceCertHistory, error)
 	SelectDeviceCertHistoryLastThirtyDays() (device.DeviceCertsHistory, error)
 	UpdateDeviceCertHistory(deviceId string, serialNumber string, newStatus string) error
+
+	SelectDmssLastIssuedCert() (device.DMSsLastIssued, error)
 }
