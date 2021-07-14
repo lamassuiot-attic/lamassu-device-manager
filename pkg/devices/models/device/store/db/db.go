@@ -393,7 +393,7 @@ func (db *DB) SelectDmssLastIssuedCert() (device.DMSsLastIssued, error) {
 	var dmssLastIssued []device.DMSLastIssued
 	for rows.Next() {
 		var lastIssued device.DMSLastIssued
-		err := rows.Scan(&lastIssued.SerialNumber, &lastIssued.Timestamp, &lastIssued.SerialNumber)
+		err := rows.Scan(&lastIssued.DmsId, &lastIssued.Timestamp, &lastIssued.SerialNumber)
 		if err != nil {
 			level.Error(db.logger).Log("err", err, "msg", "Unable to read database Device row")
 			return device.DMSsLastIssued{}, err
