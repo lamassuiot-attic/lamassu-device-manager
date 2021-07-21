@@ -46,18 +46,6 @@ func (ca *DeviceService) Enroll(ctx context.Context, csr *x509.CertificateReques
 		return nil, err
 	}
 
-	if device.Status == devicesModel.DeviceCertRevoked {
-		err := "Cant issue a certificate for a revoked certificate"
-		fmt.Println(err)
-		return nil, errors.New(err)
-	}
-
-	if device.Status == devicesModel.DeviceCertExpired {
-		err := "Cant issue a certificate for an expired cert"
-		fmt.Println(err)
-		return nil, errors.New(err)
-	}
-
 	if device.Status == devicesModel.DeviceDecommisioned {
 		err := "Cant issue a certificate for a decommisioned device"
 		fmt.Println(err)
