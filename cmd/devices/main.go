@@ -114,7 +114,7 @@ func main() {
 		os.Exit(1)
 	}
 	level.Info(logger).Log("msg", "Connection established with Consul Service Discovery")
-	err = consulsd.Register("https", "enroller", cfg.Port)
+	err = consulsd.Register("https", "device-manager", cfg.Port)
 	if err != nil {
 		level.Error(logger).Log("err", err, "msg", "Could not register service liveness information to Consul")
 		os.Exit(1)
