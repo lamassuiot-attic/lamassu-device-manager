@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/lamassuiot/lamassu-est/configs"
 	"math/big"
 	"net/http"
 	"strings"
@@ -14,8 +15,8 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/lamassuiot/lamassu-est/client/estclient"
 
-	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
-	devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
+	devicesModel "github.com/lamassuiot/enroller/pkg/devices/models/device"
+	devicesStore "github.com/lamassuiot/enroller/pkg/devices/models/device/store"
 )
 
 type DeviceService struct {
@@ -33,6 +34,23 @@ func (ca *DeviceService) CACerts(ctx context.Context, aps string, req *http.Requ
 
 	var filteredCerts []*x509.Certificate
 
+	configStr, err := configs.NewConfigEnvClient("est")
+	if err != nil {
+		fmt.Errorf("failed to laod env variables %v", err)
+	}
+
+	cfg, err := configs.NewConfig(configStr)
+	if err != nil {
+		fmt.Errorf("failed to make EST client's configurations: %v", err)
+	}
+
+	client, err := estclient.NewClient(cfg)
+
+	filteredCerts, err = client.GetCAs(aps)
+	if err != nil {
+		return nil, err
+	}
+
 	return filteredCerts, nil
 }
 
@@ -45,20 +63,30 @@ func (ca *DeviceService) Enroll(ctx context.Context, csr *x509.CertificateReques
 		}
 		return nil, err
 	}
-
 	if device.Status == devicesModel.DeviceDecommisioned {
 		err := "Cant issue a certificate for a decommisioned device"
 		fmt.Println(err)
 		return nil, errors.New(err)
 	}
-
 	if device.Status == devicesModel.DeviceProvisioned {
 		err := "The device (" + deviceId + ") already has a valid certificate"
 		fmt.Println(err)
 		return nil, errors.New(err)
 	}
 
-	cert, err := estclient.Enroll(csr, aps)
+	configStr, err := configs.NewConfigEnvClient("est")
+	if err != nil {
+		fmt.Errorf("failed to laod env variables %v", err)
+	}
+
+	cfg, err := configs.NewConfig(configStr)
+	if err != nil {
+		fmt.Errorf("failed to make EST client's configurations: %v", err)
+	}
+
+	client, err := estclient.NewClient(cfg)
+
+	cert, err := client.Enroll(csr, aps)
 	if err != nil {
 		return nil, err
 	}
@@ -105,11 +133,77 @@ func (ca *DeviceService) CSRAttrs(ctx context.Context, aps string, r *http.Reque
 }
 
 func (ca *DeviceService) Reenroll(ctx context.Context, cert *x509.Certificate, csr *x509.CertificateRequest, aps string, r *http.Request) (*x509.Certificate, error) {
-	newCert, err := estclient.Reenroll(csr, aps)
+	deviceId := csr.Subject.CommonName
+	device, err := ca.devicesDb.SelectDeviceById(deviceId)
+	if err != nil {
+		if strings.Contains(err.Error(), "no rows in result set") {
+			fmt.Println("Device " + deviceId + " does not exist. Register the device first, and enroll it afterwards")
+		}
+		return nil, err
+	}
+	if device.Status == devicesModel.DeviceDecommisioned {
+		err := "Cant issue a certificate for a decommisioned device"
+		fmt.Println(err)
+		return nil, errors.New(err)
+	}
+	if device.Status == devicesModel.DeviceProvisioned {
+		err := "The device (" + deviceId + ") already has a valid certificate"
+		fmt.Println(err)
+		return nil, errors.New(err)
+	}
+
+	configStr, err := configs.NewConfigEnvClient("est")
+	if err != nil {
+		fmt.Errorf("failed to laod env variables %v", err)
+	}
+
+	cfg, err := configs.NewConfig(configStr)
+	if err != nil {
+		fmt.Errorf("failed to make EST client's configurations: %v", err)
+	}
+
+	client, err := estclient.NewClient(cfg)
+
+	crt, err := client.Reenroll(csr, aps)
 	if err != nil {
 		return nil, err
 	}
-	return newCert, nil
+
+	deviceId = crt.Subject.CommonName
+	fmt.Println("Device ID: " + deviceId)
+	log := devicesModel.DeviceLog{
+		DeviceId:   deviceId,
+		LogType:    devicesModel.LogProvisioned,
+		LogMessage: "",
+	}
+	err = ca.devicesDb.InsertLog(log)
+	if err != nil {
+		return nil, err
+	}
+
+	serialNumber := insertNth(toHexInt(crt.SerialNumber), 2)
+	certHistory := devicesModel.DeviceCertHistory{
+		SerialNumber: serialNumber,
+		DeviceId:     deviceId,
+		IsuuerName:   aps,
+		Status:       devicesModel.CertHistoryActive,
+	}
+	err = ca.devicesDb.InsertDeviceCertHistory(certHistory)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ca.devicesDb.UpdateDeviceStatusByID(deviceId, devicesModel.DeviceProvisioned)
+	if err != nil {
+		return nil, err
+	}
+
+	err = ca.devicesDb.UpdateDeviceCertificateSerialNumberByID(deviceId, serialNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	return crt, nil
 }
 
 func (ca *DeviceService) ServerKeyGen(ctx context.Context, csr *x509.CertificateRequest, aps string, r *http.Request) (*x509.Certificate, []byte, error) {
