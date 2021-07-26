@@ -6,6 +6,8 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+	devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
 	"github.com/lamassuiot/lamassu-est/configs"
 	"math/big"
 	"net/http"
@@ -14,9 +16,6 @@ import (
 	"github.com/globalsign/est"
 	"github.com/go-kit/kit/log"
 	"github.com/lamassuiot/lamassu-est/client/estclient"
-
-	devicesModel "github.com/lamassuiot/enroller/pkg/devices/models/device"
-	devicesStore "github.com/lamassuiot/enroller/pkg/devices/models/device/store"
 )
 
 type DeviceService struct {
