@@ -128,7 +128,7 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 
 	ca := ca.NewVaultService(devicesDb)
-	server, _ := estserver.NewServer(ca)
+	server, _ := estserver.NewServerDeviceManager(ca)
 
 	errs := make(chan error)
 	go func() {
