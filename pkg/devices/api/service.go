@@ -295,7 +295,6 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Could not parse response json")
 	}
-	fmt.Println(authData["access_token"])
 
 	req, err := http.NewRequest(
 		"GET",
