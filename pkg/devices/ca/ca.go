@@ -185,9 +185,9 @@ func (ca *DeviceEstService) Reenroll(ctx context.Context, cert *x509.Certificate
 	}
 
 	// fmt.Println(certExpirationTime)
-	// fmt.Println(time.Now().Add(-time.Hour * 24 * time.Duration(ca.minReenrollDays)))
-	// fmt.Println(certExpirationTime.Before(time.Now().Add(-time.Hour * 24 * time.Duration(ca.minReenrollDays))))
-	if certExpirationTime.Before(time.Now().Add(-time.Hour * 24 * time.Duration(ca.minReenrollDays))) {
+	// fmt.Println(time.Now().Add(time.Hour * 24 * time.Duration(ca.minReenrollDays)))
+	// fmt.Println(certExpirationTime.Before(time.Now().Add(time.Hour * 24 * time.Duration(ca.minReenrollDays))))
+	if certExpirationTime.Before(time.Now().Add(time.Hour * 24 * time.Duration(ca.minReenrollDays))) {
 		msg := "Reenrolling device"
 		fmt.Println(msg)
 	} else {
