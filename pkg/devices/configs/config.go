@@ -16,17 +16,20 @@ type Config struct {
 	ConsulPort     string
 	ConsulCA       string
 
-	KeycloakHostname string
-	KeycloakPort     string
-	KeycloakProtocol string
-	KeycloakRealm    string
-	KeycloakCA       string
+	KeycloakHostname     string
+	KeycloakPort         string
+	KeycloakProtocol     string
+	KeycloakRealm        string
+	KeycloakCA           string
+	KeycloakClientId     string
+	KeycloakClientSecret string
 
 	CACertfile   string
 	CAServerAddr string
 
-	CertFile string
-	KeyFile  string
+	CertFile            string
+	KeyFile             string
+	MinimumReenrollDays string
 }
 
 func NewConfig(prefix string) (error, Config) {

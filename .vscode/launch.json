@@ -9,10 +9,17 @@
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "envFile": "${workspaceFolder}/no-git/.env",
+            "envFile": "${workspaceFolder}/nogit/.env",
             "program": "${workspaceFolder}/cmd/devices/main.go",
             "env": {},
-            "args": []
+            "args": [],
+            "dlvLoadConfig": {
+                "followPointers": true,
+                "maxVariableRecurse": 1,
+                "maxStringLen": 400,
+                "maxArrayValues": 64,
+                "maxStructFields": -1
+            }
         },
     ]
 }

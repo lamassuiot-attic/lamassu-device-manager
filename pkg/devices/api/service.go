@@ -11,6 +11,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/go-kit/kit/auth/jwt"
@@ -29,7 +32,7 @@ type Service interface {
 	GetDeviceById(ctx context.Context, deviceId string) (devicesModel.Device, error)
 	GetDevicesByDMS(ctx context.Context, dmsId string) (devicesModel.Devices, error)
 	DeleteDevice(ctx context.Context, id string) error
-	RevokeDeviceCert(ctx context.Context, id string) error
+	RevokeDeviceCert(ctx context.Context, id string, revocationReason string) error
 
 	GetDeviceLogs(ctx context.Context, id string) (devicesModel.DeviceLogs, error)
 	GetDeviceCert(ctx context.Context, id string) (devicesModel.DeviceCert, error)
@@ -39,11 +42,15 @@ type Service interface {
 }
 
 type devicesService struct {
-	mtx       sync.RWMutex
-	devicesDb devicesStore.DB
-	logger    log.Logger
-	caClient  *http.Client
-	caUrl     string
+	mtx                  sync.RWMutex
+	devicesDb            devicesStore.DB
+	logger               log.Logger
+	caClient             *http.Client
+	caUrl                string
+	keycloakClient       *http.Client
+	keycloakUrl          string
+	keycloakClientId     string
+	keycloakClientSecret string
 }
 
 var (
@@ -60,11 +67,15 @@ var (
 	ErrResponseEncode   = errors.New("error encoding response")
 )
 
-func NewDevicesService(devicesDb devicesStore.DB, caClient *http.Client, caUrl string) Service {
+func NewDevicesService(devicesDb devicesStore.DB, caClient *http.Client, caUrl string, keycloakClient *http.Client, keycloakUrl string, keycloakClientId string, keycloakClientSecret string) Service {
 	return &devicesService{
-		devicesDb: devicesDb,
-		caClient:  caClient,
-		caUrl:     caUrl,
+		devicesDb:            devicesDb,
+		caClient:             caClient,
+		caUrl:                caUrl,
+		keycloakClient:       keycloakClient,
+		keycloakUrl:          keycloakUrl,
+		keycloakClientId:     keycloakClientId,
+		keycloakClientSecret: keycloakClientSecret,
 	}
 }
 
@@ -132,7 +143,7 @@ func (s *devicesService) GetDeviceById(ctx context.Context, deviceId string) (de
 }
 
 func (s *devicesService) DeleteDevice(ctx context.Context, id string) error {
-	_ = s.RevokeDeviceCert(ctx, id)
+	_ = s.RevokeDeviceCert(ctx, id, "Revocation due to device removal")
 
 	/*
 		err := s.devicesDb.DeleteDevice(id)
@@ -157,7 +168,7 @@ func (s *devicesService) DeleteDevice(ctx context.Context, id string) error {
 	return err
 }
 
-func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string) error {
+func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revocationReason string) error {
 	dev, err := s.devicesDb.SelectDeviceById(id)
 	if err != nil {
 		return err
@@ -172,10 +183,11 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string) error 
 		return err
 	}
 
+	serialNumberToRevoke := currentCertHistory.SerialNumber
 	// revoke
 	req, err := http.NewRequest(
 		"DELETE",
-		s.caUrl+"/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
+		s.caUrl+"/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+serialNumberToRevoke,
 		nil,
 	)
 	if err != nil {
@@ -211,7 +223,7 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string) error 
 	log := devicesModel.DeviceLog{
 		DeviceId:   id,
 		LogType:    devicesModel.LogCertRevoked,
-		LogMessage: "",
+		LogMessage: revocationReason + ". Certificate with Serial Number " + serialNumberToRevoke + " revoked.",
 	}
 	err = s.devicesDb.InsertLog(log)
 	if err != nil {
@@ -251,6 +263,40 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 		return devicesModel.DeviceCert{}, err
 	}
 
+	urlEncodedData := url.Values{}
+	urlEncodedData.Set("grant_type", "client_credentials")
+	urlEncodedData.Set("client_id", s.keycloakClientId)
+	urlEncodedData.Set("client_secret", s.keycloakClientSecret)
+
+	reqAuthApi, err := http.NewRequest(
+		"POST",
+		s.keycloakUrl+"/protocol/openid-connect/token",
+		strings.NewReader(urlEncodedData.Encode()),
+	)
+	reqAuthApi.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	reqAuthApi.Header.Add("Content-Length", strconv.Itoa(len(urlEncodedData.Encode())))
+
+	if err != nil {
+		return devicesModel.DeviceCert{}, err
+	}
+
+	authResponse, err := s.keycloakClient.Do(reqAuthApi)
+	if err != nil {
+		return devicesModel.DeviceCert{}, err
+	}
+	defer authResponse.Body.Close()
+
+	var authData map[string]interface{}
+	authBody, err := ioutil.ReadAll(authResponse.Body)
+	if err != nil {
+		level.Error(s.logger).Log("err", err, "msg", "Could not parse response body")
+	}
+	err = json.Unmarshal(authBody, &authData)
+	if err != nil {
+		level.Error(s.logger).Log("err", err, "msg", "Could not parse response json")
+	}
+	fmt.Println(authData["access_token"])
+
 	req, err := http.NewRequest(
 		"GET",
 		s.caUrl+"/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
@@ -261,7 +307,8 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 	}
 
 	req.Header.Add("Accept", "application/json")
-	reqToken := ctx.Value(jwt.JWTTokenContextKey)
+	//reqToken := ctx.Value(jwt.JWTTokenContextKey)
+	reqToken := authData["access_token"]
 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", reqToken))
 	_ = req.WithContext(ctx)

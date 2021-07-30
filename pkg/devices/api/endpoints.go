@@ -152,7 +152,7 @@ func MakeDeleteDeviceEndpoint(s Service) endpoint.Endpoint {
 func MakeDeleteRevokeEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(deleteRevokeRequest)
-		e := s.RevokeDeviceCert(ctx, req.Id)
+		e := s.RevokeDeviceCert(ctx, req.Id, "Manual revocation")
 		return nil, e
 	}
 }

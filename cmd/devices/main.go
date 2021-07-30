@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -88,9 +89,24 @@ func main() {
 	caClient := &http.Client{Transport: tr}
 	caUrl := cfg.CAServerAddr
 
+	keycloakPem, err := ioutil.ReadFile(cfg.KeycloakCA)
+	if err != nil {
+		level.Error(logger).Log("err", err, "msg", "Could not read Keycloak cert file")
+		os.Exit(1)
+	}
+	certPoolKeycloak := x509.NewCertPool()
+	certPoolKeycloak.AppendCertsFromPEM(keycloakPem)
+
+	trKeycloak := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			RootCAs: certPoolKeycloak,
+		},
+	}
+	keycloakClient := &http.Client{Transport: trKeycloak}
+	keycloakUrl := cfg.KeycloakProtocol + "://" + cfg.KeycloakHostname + ":" + cfg.KeycloakPort + "/auth/realms/" + cfg.KeycloakRealm
 	var s api.Service
 	{
-		s = api.NewDevicesService(devicesDb, caClient, caUrl)
+		s = api.NewDevicesService(devicesDb, caClient, caUrl, keycloakClient, keycloakUrl, cfg.KeycloakClientId, cfg.KeycloakClientSecret)
 		s = api.LoggingMiddleware(logger)(s)
 		s = api.NewInstrumentingMiddleware(
 			kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
@@ -127,7 +143,9 @@ func main() {
 	http.Handle("/", accessControl(mux, "", "", ""))
 	http.Handle("/metrics", promhttp.Handler())
 
-	ca := ca.NewVaultService(devicesDb)
+	minimumReenrollDays, err := strconv.Atoi(cfg.MinimumReenrollDays)
+
+	ca := ca.NewEstService(devicesDb, caClient, caUrl, keycloakClient, keycloakUrl, cfg.KeycloakClientId, cfg.KeycloakClientSecret, minimumReenrollDays, logger)
 	server, _ := estserver.NewServerDeviceManager(ca)
 
 	errs := make(chan error)

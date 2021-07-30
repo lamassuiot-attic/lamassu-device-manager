@@ -85,14 +85,14 @@ func (mw *instrumentingMiddleware) DeleteDevice(ctx context.Context, id string) 
 
 	return mw.next.DeleteDevice(ctx, id)
 }
-func (mw *instrumentingMiddleware) RevokeDeviceCert(ctx context.Context, id string) (err error) {
+func (mw *instrumentingMiddleware) RevokeDeviceCert(ctx context.Context, id string, revocationReason string) (err error) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "RevokeDeviceCert", "error", fmt.Sprint(err != nil)}
 		mw.requestCount.With(lvs...).Add(1)
 		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
 	}(time.Now())
 
-	return mw.next.RevokeDeviceCert(ctx, id)
+	return mw.next.RevokeDeviceCert(ctx, id, revocationReason)
 }
 func (mw *instrumentingMiddleware) GetDeviceLogs(ctx context.Context, id string) (logs devicesModel.DeviceLogs, err error) {
 	defer func(begin time.Time) {
