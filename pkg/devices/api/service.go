@@ -16,7 +16,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/go-kit/kit/auth/jwt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
@@ -183,6 +182,11 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revoca
 		return err
 	}
 
+	keycloakToken, err := s.getKeycloakToken()
+	if err != nil {
+		return err
+	}
+
 	serialNumberToRevoke := currentCertHistory.SerialNumber
 	// revoke
 	req, err := http.NewRequest(
@@ -195,16 +199,15 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revoca
 	}
 
 	req.Header.Add("Accept", "application/json")
-	reqToken := ctx.Value(jwt.JWTTokenContextKey)
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", reqToken))
+	req.Header.Add("Authorization", keycloakToken)
 	_ = req.WithContext(ctx)
 
-	_, err = s.caClient.Do(req)
+	resp, err := s.caClient.Do(req)
 	if err != nil {
 		return err
 	}
-
+	fmt.Println(resp)
 	err = s.devicesDb.UpdateDeviceCertHistory(id, dev.CurrentCertSerialNumber, devicesModel.CertHistoryRevoked)
 	if err != nil {
 		return err
@@ -263,37 +266,9 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 		return devicesModel.DeviceCert{}, err
 	}
 
-	urlEncodedData := url.Values{}
-	urlEncodedData.Set("grant_type", "client_credentials")
-	urlEncodedData.Set("client_id", s.keycloakClientId)
-	urlEncodedData.Set("client_secret", s.keycloakClientSecret)
-
-	reqAuthApi, err := http.NewRequest(
-		"POST",
-		s.keycloakUrl+"/protocol/openid-connect/token",
-		strings.NewReader(urlEncodedData.Encode()),
-	)
-	reqAuthApi.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	reqAuthApi.Header.Add("Content-Length", strconv.Itoa(len(urlEncodedData.Encode())))
-
+	keycloakToken, err := s.getKeycloakToken()
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
-	}
-
-	authResponse, err := s.keycloakClient.Do(reqAuthApi)
-	if err != nil {
-		return devicesModel.DeviceCert{}, err
-	}
-	defer authResponse.Body.Close()
-
-	var authData map[string]interface{}
-	authBody, err := ioutil.ReadAll(authResponse.Body)
-	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not parse response body")
-	}
-	err = json.Unmarshal(authBody, &authData)
-	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not parse response json")
 	}
 
 	req, err := http.NewRequest(
@@ -307,9 +282,8 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 
 	req.Header.Add("Accept", "application/json")
 	//reqToken := ctx.Value(jwt.JWTTokenContextKey)
-	reqToken := authData["access_token"]
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", reqToken))
+	req.Header.Add("Authorization", keycloakToken)
 	_ = req.WithContext(ctx)
 
 	response, err := s.caClient.Do(req)
@@ -417,6 +391,44 @@ func getKeyStrength(keyType string, keyBits int) string {
 		}
 	}
 	return keyStrength
+}
+
+func (s *devicesService) getKeycloakToken() (string, error) {
+	urlEncodedData := url.Values{}
+	urlEncodedData.Set("grant_type", "client_credentials")
+	urlEncodedData.Set("client_id", s.keycloakClientId)
+	urlEncodedData.Set("client_secret", s.keycloakClientSecret)
+
+	reqAuthApi, err := http.NewRequest(
+		"POST",
+		s.keycloakUrl+"/protocol/openid-connect/token",
+		strings.NewReader(urlEncodedData.Encode()),
+	)
+	reqAuthApi.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	reqAuthApi.Header.Add("Content-Length", strconv.Itoa(len(urlEncodedData.Encode())))
+
+	if err != nil {
+		return "", err
+	}
+
+	authResponse, err := s.keycloakClient.Do(reqAuthApi)
+	if err != nil {
+		return "", err
+	}
+	defer authResponse.Body.Close()
+
+	var authData map[string]interface{}
+	authBody, err := ioutil.ReadAll(authResponse.Body)
+	if err != nil {
+		level.Error(s.logger).Log("err", err, "msg", "Could not parse response body")
+	}
+	err = json.Unmarshal(authBody, &authData)
+	if err != nil {
+		level.Error(s.logger).Log("err", err, "msg", "Could not parse response json")
+	}
+
+	reqToken := authData["access_token"]
+	return fmt.Sprintf("Bearer %s", reqToken), nil
 }
 
 func _generateCSR(ctx context.Context, keyType string, priv interface{}, commonName string, country string, state string, locality string, org string, orgUnit string) ([]byte, error) {

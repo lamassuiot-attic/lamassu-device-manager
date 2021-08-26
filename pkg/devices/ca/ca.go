@@ -170,6 +170,7 @@ func (ca *DeviceEstService) Reenroll(ctx context.Context, cert *x509.Certificate
 		devicesService = api.LoggingMiddleware(ca.logger)(devicesService)
 	}
 	retrievedDeviceCert, err := devicesService.GetDeviceCert(ctx, cert.Subject.CommonName)
+
 	if err != nil {
 		errMsg := "An error ocurred while trying to fetch the current device's cert"
 		//level.Error(ca.logger).Log("err", err, "msg", errMsg)
@@ -214,14 +215,17 @@ func (ca *DeviceEstService) Reenroll(ctx context.Context, cert *x509.Certificate
 	}
 
 	client, err := estclient.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
 
-	crt, err := client.Enroll(csr, aps)
+	crt, err := client.Enroll(csr, retrievedDeviceCert.CAName)
 	if err != nil {
 		return nil, err
 	}
 
 	deviceId = crt.Subject.CommonName
-	serialNumber := insertNth(toHexInt(cert.SerialNumber), 2)
+	serialNumber := insertNth(toHexInt(crt.SerialNumber), 2)
 	log := devicesModel.DeviceLog{
 		DeviceId:   deviceId,
 		LogType:    devicesModel.LogProvisioned,
@@ -237,7 +241,7 @@ func (ca *DeviceEstService) Reenroll(ctx context.Context, cert *x509.Certificate
 		certHistory := devicesModel.DeviceCertHistory{
 			SerialNumber: serialNumber,
 			DeviceId:     deviceId,
-			IsuuerName:   aps,
+			IsuuerName:   retrievedDeviceCert.CAName,
 			Status:       devicesModel.CertHistoryActive,
 		}
 		err = ca.devicesDb.InsertDeviceCertHistory(certHistory)
