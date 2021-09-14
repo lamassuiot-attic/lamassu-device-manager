@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"path"
 	"time"
 
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/ca"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/api"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/auth"
+	"github.com/go-openapi/runtime/middleware"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/configs"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/discovery/consul"
 	devicesDb "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store/db"
@@ -29,6 +31,10 @@ import (
 	jaegercfg "github.com/uber/jaeger-client-go/config"
 )
 
+const (
+	defaultListenAddr = "https://localhost:8089/v1"
+)
+
 func main() {
 	var logger log.Logger
 	{
@@ -37,6 +43,7 @@ func main() {
 		logger = log.With(logger, "caller", log.DefaultCaller)
 		logger = level.NewFilter(logger, level.AllowInfo())
 	}
+	
 
 	err, cfg := configs.NewConfig("devices")
 	if err != nil {
@@ -140,8 +147,14 @@ func main() {
 	mux := http.NewServeMux()
 
 	mux.Handle("/v1/", api.MakeHTTPHandler(s, log.With(logger, "component", "HTTPS"), auth, tracer))
-	http.Handle("/", accessControl(mux, "", "", ""))
+	http.Handle("/v1/docs", middleware.SwaggerUI(middleware.SwaggerUIOpts{
+		BasePath: "/v1/",
+		SpecURL:  path.Join("/", "swagger.json"),
+		Path:     "docs",
+	}, mux))
+	http.Handle("/", accessControl(mux, cfg.EnrollerUIProtocol, cfg.EnrollerUIHost, cfg.EnrollerUIPort))
 	http.Handle("/metrics", promhttp.Handler())
+	http.Handle("/swagger.json", http.FileServer(http.Dir("./docs")))
 
 	minimumReenrollDays, err := strconv.Atoi(cfg.MinimumReenrollDays)
 

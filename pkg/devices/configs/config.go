@@ -5,6 +5,10 @@ import "github.com/kelseyhightower/envconfig"
 type Config struct {
 	Port string
 
+	EnrollerUIHost     string
+	EnrollerUIPort     string
+	EnrollerUIProtocol string
+	
 	PostgresUser     string
 	PostgresDB       string
 	PostgresPassword string
