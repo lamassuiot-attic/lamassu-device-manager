@@ -11,7 +11,7 @@
   },
   "servers": [
     {
-      "url": "https://jon.io:8089/v1"
+      "url": "https://dev.lamassu.io:8089/v1"
     }
   ],
   "paths": {
@@ -22,12 +22,9 @@
         ],
         "summary": "Get Devices",
         "operationId": "GetDevice",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
+            "bearerAuth": []
           }
         ],
         "responses": {
@@ -49,12 +46,9 @@
         ],
         "summary": "Create Device",
         "operationId": "CreateDevice",
-        "parameters": [
+        "security": [
           {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
+            "bearerAuth": []
           }
         ],
         "requestBody": {
@@ -90,6 +84,11 @@
         ],
         "summary": "Get Devices Logs",
         "operationId": "GetLogs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "deviceId",
@@ -99,12 +98,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
           }
         ],
         "responses": {
@@ -128,6 +121,11 @@
         ],
         "summary": "Get Cert History",
         "operationId": "CetCertHistory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "deviceId",
@@ -137,12 +135,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
           }
         ],
         "responses": {
@@ -166,6 +158,11 @@
         ],
         "summary": "Get Device by ID",
         "operationId": "GetDevicebyID",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "deviceId",
@@ -175,12 +172,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
           }
         ],
         "responses": {
@@ -202,6 +193,11 @@
         ],
         "summary": "Delete device",
         "operationId": "Deletedevice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "deviceId",
@@ -211,12 +207,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
           }
         ],
         "responses": {
@@ -240,6 +230,11 @@
         ],
         "summary": "Get Device Certificate",
         "operationId": "GetDevicecert",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "deviceId",
@@ -249,12 +244,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
           }
         ],
         "responses": {
@@ -278,6 +267,11 @@
         ],
         "summary": "Revoke certificate",
         "operationId": "RevokeCert",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
             "name": "deviceId",
@@ -287,12 +281,6 @@
             "schema": {
               "type": "string"
             }
-          },
-          {
-            "name": "Authorization",
-            "in": "header",
-            "description": "JWT Toker usar Bearer {token}",
-            "schema": {}
           }
         ],
         "responses": {
@@ -335,22 +323,6 @@
           }
         },
         "x-go-package": "github.com/lamassuiot/lamassu-ca/pkg/api"
-      },
-      "DeviceID": {
-        "required": [
-          "deviceid"
-        ],
-        "type": "object",
-        "properties": {
-          "deviceid": {
-            "type": "string",
-            "description": "Device ID",
-            "example": "8f165f1a-b83b-4f10-ae4a-2f3f36dc2572",
-            "x-go-name": "DeviceId"
-          }
-        },
-        "description": "The Device ID",
-        "x-go-package": "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
       },
       "Log": {
         "required": [
@@ -539,6 +511,18 @@
         "description": "Create Device",
         "x-go-package": "github.com/lamassuiot/lamassu-ca/pkg/secrets"
       }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     }
-  }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
 }
