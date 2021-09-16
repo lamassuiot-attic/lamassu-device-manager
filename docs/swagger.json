@@ -1,0 +1,528 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Lamassu-Device Manager",
+    "description": "The purpose of Device Manager is to provide a wrapper API to manage\nDevices registered in Lamassu PKI.",
+    "license": {
+      "name": "MPL-2.0",
+      "url": "https://opensource.org/licenses/MPL-2.0"
+    },
+    "version": "0.0.1"
+  },
+  "servers": [
+    {
+      "url": "https://dev.lamassu.io:8089/v1"
+    }
+  ],
+  "paths": {
+    "/devices": {
+      "get": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Get Devices",
+        "operationId": "GetDevice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get Device Information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateDevice"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Create Device",
+        "operationId": "CreateDevice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "description": "Create Device",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDevice"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Get Device Information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateDevice"
+                }
+              }
+            }
+          }
+        },
+        "x-codegen-request-body-name": "Create Device"
+      }
+    },
+    "/devices/{deviceId}/logs": {
+      "get": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Get Devices Logs",
+        "operationId": "GetLogs",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "Device ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get Device Log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Log"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/devices/{deviceId}/cert-history": {
+      "get": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Get Cert History",
+        "operationId": "CetCertHistory",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "Device ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get Cert History",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CertHistory"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/devices/{deviceId}": {
+      "get": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Get Device by ID",
+        "operationId": "GetDevicebyID",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "Device ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get device information by ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateDevice"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Delete device",
+        "operationId": "Deletedevice",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "Device ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/devices/{deviceId}/cert": {
+      "get": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Get Device Certificate",
+        "operationId": "GetDevicecert",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "Device ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get device certificate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceCert"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/devices/{deviceId}/revoke": {
+      "delete": {
+        "tags": [
+          "Device Manager"
+        ],
+        "summary": "Revoke certificate",
+        "operationId": "RevokeCert",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "description": "Device ID",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Service Status"
+        ],
+        "summary": "Gets service health.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "$ref": "#/components/schemas/HealthResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "healthy": {
+            "type": "boolean",
+            "x-go-name": "Healthy"
+          }
+        },
+        "x-go-package": "github.com/lamassuiot/lamassu-ca/pkg/api"
+      },
+      "Log": {
+        "required": [
+          "deviceid",
+          "id",
+          "logmessage",
+          "logtype",
+          "timestamp"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Log ID",
+            "x-go-name": "Id"
+          },
+          "deviceid": {
+            "type": "string",
+            "description": "Device ID",
+            "example": "8f165f1a-b83b-4f10-ae4a-2f3f36dc2572",
+            "x-go-name": "DeviceId"
+          },
+          "logtype": {
+            "type": "string",
+            "description": "Log Type",
+            "example": "Provisioned",
+            "x-go-name": "LogType"
+          },
+          "logmessage": {
+            "type": "string",
+            "description": "Log Message",
+            "x-go-name": "LogMessage"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Timestamp",
+            "x-go-name": "Timestamp"
+          }
+        },
+        "description": "Device Log",
+        "x-go-package": "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+      },
+      "CertHistory": {
+        "required": [
+          "ca",
+          "deviceid",
+          "serialnumber",
+          "status"
+        ],
+        "type": "object",
+        "properties": {
+          "serialnumber": {
+            "type": "string",
+            "description": "The serial number of the CA",
+            "example": "7e:36:13:a5:31:9f:4a:76:10:64:2e:9b:0a:11:07:b7:e6:3e:cf:94",
+            "x-go-name": "SerialNumber"
+          },
+          "ca": {
+            "type": "string",
+            "description": "The name of the CA",
+            "example": "Lamassu-Root-CA1-RSA4096",
+            "x-go-name": "CA Name"
+          },
+          "status": {
+            "type": "string",
+            "description": "Cert status",
+            "example": "Revoked",
+            "x-go-name": "Status"
+          },
+          "deviceid": {
+            "type": "string",
+            "description": "Device ID",
+            "example": "8f165f1a-b83b-4f10-ae4a-2f3f36dc2572",
+            "x-go-name": "DeviceId"
+          }
+        },
+        "description": "Cert History",
+        "x-go-package": "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+      },
+      "DeviceCert": {
+        "required": [
+          "ca",
+          "cert",
+          "serialnumber"
+        ],
+        "type": "object",
+        "properties": {
+          "serialnumber": {
+            "type": "string",
+            "description": "The serial number of the CA",
+            "example": "7e:36:13:a5:31:9f:4a:76:10:64:2e:9b:0a:11:07:b7:e6:3e:cf:94",
+            "x-go-name": "SerialNumber"
+          },
+          "ca": {
+            "type": "string",
+            "description": "The name of the CA",
+            "example": "Lamassu-Root-CA1-RSA4096",
+            "x-go-name": "CA Name"
+          },
+          "cert": {
+            "type": "string",
+            "description": "Certificate",
+            "x-go-name": "CRT"
+          }
+        },
+        "description": "Device certificate",
+        "x-go-package": "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+      },
+      "CreateDevice": {
+        "required": [
+          "alias",
+          "commonname",
+          "country",
+          "id",
+          "keybits",
+          "keytype",
+          "locality",
+          "organization",
+          "organizationunit",
+          "state"
+        ],
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "string",
+            "description": "Country Name of the CA certificate",
+            "example": "ES",
+            "x-go-name": "Country"
+          },
+          "commonname": {
+            "type": "string",
+            "description": "Common name of the CA certificate",
+            "example": "8f165f1a-b83b-4f10-ae4a-2f3f36dc2572",
+            "x-go-name": "Common Name"
+          },
+          "keybits": {
+            "type": "integer",
+            "description": "Length used to create CA key",
+            "format": "int64",
+            "example": 4096,
+            "x-go-name": "KeyBits"
+          },
+          "keytype": {
+            "type": "string",
+            "description": "Algorithm used to create CA key",
+            "example": "RSA",
+            "x-go-name": "KeyType"
+          },
+          "locality": {
+            "type": "string",
+            "description": "Locality of the CA certificate",
+            "example": "Arrasate",
+            "x-go-name": "Locality"
+          },
+          "organization": {
+            "type": "string",
+            "description": "Organization of the CA certificate",
+            "example": "Lamassu IoT",
+            "x-go-name": "Organization"
+          },
+          "state": {
+            "type": "string",
+            "description": "State of the CA certificate",
+            "example": "Guipuzcoa",
+            "x-go-name": "State"
+          },
+          "alias": {
+            "type": "string",
+            "description": "Device ALias",
+            "example": "GMS Device",
+            "x-go-name": "Device Alias"
+          },
+          "id": {
+            "type": "string",
+            "description": "Device ID",
+            "example": "8f165f1a-b83b-4f10-ae4a-2f3f36dc2572",
+            "x-go-name": "ID"
+          },
+          "organizationunit": {
+            "type": "string",
+            "description": "Organization Unit of the CA certificate",
+            "example": " Lamassu IoT department 1",
+            "x-go-name": "Organization Unit"
+          }
+        },
+        "description": "Create Device",
+        "x-go-package": "github.com/lamassuiot/lamassu-ca/pkg/secrets"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ]
+}

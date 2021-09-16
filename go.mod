@@ -7,6 +7,7 @@ require (
 	github.com/go-kit/kit v0.10.0
 	github.com/google/uuid v1.2.0
 	github.com/gorilla/mux v1.7.4
+	github.com/go-openapi/runtime v0.19.28
 	github.com/hashicorp/consul/api v1.4.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lamassuiot/est v1.0.7-0.20210730070054-f75062f1e33f
