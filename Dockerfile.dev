@@ -1,0 +1,8 @@
+FROM golang:1.16 as build
+RUN CGO_ENABLED=0 go get -ldflags "-s -w -extldflags '-static'" github.com/go-delve/delve/cmd/dlv
+
+
+FROM alpine:3.14
+COPY --from=build /go/bin/dlv /dlv
+COPY devices /devices
+ENTRYPOINT [ "/dlv" ]

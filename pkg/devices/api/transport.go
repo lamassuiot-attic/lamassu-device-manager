@@ -6,12 +6,10 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/auth"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 
 	"github.com/gorilla/mux"
 
-	stdjwt "github.com/dgrijalva/jwt-go"
 	"github.com/go-kit/kit/auth/jwt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/tracing/opentracing"
@@ -25,99 +23,152 @@ type errorer interface {
 	error() error
 }
 
-var claims = &auth.KeycloakClaims{}
+func HTTPToContext(logger log.Logger) httptransport.RequestFunc {
+	return func(ctx context.Context, req *http.Request) context.Context {
+		// Try to join to a trace propagated in `req`.
+		logger := log.With(logger, "span_id", stdopentracing.SpanFromContext(ctx))
+		return context.WithValue(ctx, "LamassuLogger", logger)
+	}
+}
 
-func MakeHTTPHandler(s Service, logger log.Logger, auth auth.Auth, otTracer stdopentracing.Tracer) http.Handler {
+func MakeHTTPHandler(s Service, logger log.Logger, otTracer stdopentracing.Tracer) http.Handler {
 	r := mux.NewRouter()
 	e := MakeServerEndpoints(s, otTracer)
 	options := []httptransport.ServerOption{
+		httptransport.ServerBefore(HTTPToContext(logger)),
 		httptransport.ServerErrorHandler(transport.NewLogErrorHandler(logger)),
 		httptransport.ServerErrorEncoder(encodeError),
-		httptransport.ServerBefore(jwt.HTTPToContext()),
 	}
-
 	r.Methods("GET").Path("/v1/health").Handler(httptransport.NewServer(
 		e.HealthEndpoint,
 		decodeHealthRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "Health", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "Health", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("POST").Path("/v1/devices").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.PostDeviceEndpoint),
+		e.PostDeviceEndpoint,
 		decodePostDeviceRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "PostDevice", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "PostDevice", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDevices),
+		e.GetDevices,
 		decodeRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDevices", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDevices", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices/{deviceId}").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDeviceById),
+		e.GetDeviceById,
 		decodeGetDeviceById,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceById", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceById", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices/dms/{dmsId}").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDevicesByDMS),
+		e.GetDevicesByDMS,
 		decodeGetDevicesByDMSRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDevicesByDMS", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDevicesByDMS", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("DELETE").Path("/v1/devices/{deviceId}").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.DeleteDevice),
+		e.DeleteDevice,
 		decodeDeleteDeviceRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "DeleteDevice", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "DeleteDevice", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("DELETE").Path("/v1/devices/{deviceId}/revoke").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.DeleteRevoke),
+		e.DeleteRevoke,
 		decodedecodeDeleteRevokeRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "DeleteRevoke", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "DeleteRevoke", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices/{deviceId}/logs").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDeviceLogs),
+		e.GetDeviceLogs,
 		decodedecodeGetDeviceLogsRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceLogs", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceLogs", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices/{deviceId}/cert").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDeviceCert),
+		e.GetDeviceCert,
 		decodedecodeGetDeviceCertRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceCert", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceCert", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices/{deviceId}/cert-history").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDeviceCertHistory),
+		e.GetDeviceCertHistory,
 		decodedecodeGetDeviceCertHistoryRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceCertHistory", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceCertHistory", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices/dms-cert-history/thirty-days").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDmsCertHistoryThirtyDays),
+		e.GetDmsCertHistoryThirtyDays,
 		decodedecodeGetDmsCertHistoryThirtyDaysRequest,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDmsCertHistoryThirtyDays", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDmsCertHistoryThirtyDays", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	r.Methods("GET").Path("/v1/devices/dms-cert-history/last-issued").Handler(httptransport.NewServer(
-		jwt.NewParser(auth.Kf, stdjwt.SigningMethodRS256, auth.KeycloakClaimsFactory)(e.GetDmsLastIssueCert),
+		e.GetDmsLastIssueCert,
 		decodedecodeGetDmsLastIssueCert,
 		encodeResponse,
-		append(options, httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDmsLastIssueCert", logger)))...,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDmsLastIssueCert", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
 	))
 
 	return r
@@ -137,7 +188,7 @@ func decodePostDeviceRequest(ctx context.Context, r *http.Request) (request inte
 	var device device.Device
 	json.NewDecoder(r.Body).Decode((&device))
 	if err != nil {
-		return nil, errors.New("Cannot decode JSON request")
+		return nil, errors.New("cannot decode JSON request")
 	}
 	req := postDeviceRequest{
 		Device: device,

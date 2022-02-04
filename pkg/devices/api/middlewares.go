@@ -6,6 +6,7 @@ import (
 
 	deviceModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/go-kit/kit/log"
 )
@@ -32,6 +33,7 @@ func (mw loggingMiddleware) Health(ctx context.Context) (healthy bool) {
 			"method", "Health",
 			"took", time.Since(begin),
 			"healthy", healthy,
+			"trace_id", opentracing.SpanFromContext(ctx),
 		)
 	}(time.Now())
 	return mw.next.Health(ctx)
@@ -44,6 +46,7 @@ func (mw loggingMiddleware) PostDevice(ctx context.Context, device deviceModel.D
 			"id", device.Id,
 			"alias", device.Alias,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -56,6 +59,7 @@ func (mw loggingMiddleware) GetDevices(ctx context.Context) (deviceResp devicesM
 			"method", "GetDevices",
 			"deviceResp", deviceResp,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -69,6 +73,7 @@ func (mw loggingMiddleware) GetDeviceById(ctx context.Context, deviceId string) 
 			"deviceId", deviceId,
 			"deviceResp", deviceResp,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -82,6 +87,7 @@ func (mw loggingMiddleware) GetDevicesByDMS(ctx context.Context, dmsId string) (
 			"dmsId", dmsId,
 			"deviceResp", deviceResp,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -94,6 +100,7 @@ func (mw loggingMiddleware) DeleteDevice(ctx context.Context, id string) (err er
 			"method", "DeleteDevice",
 			"id", id,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -107,6 +114,7 @@ func (mw loggingMiddleware) RevokeDeviceCert(ctx context.Context, id string, rev
 			"revocationReason", revocationReason,
 			"id", id,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -120,6 +128,7 @@ func (mw loggingMiddleware) GetDeviceLogs(ctx context.Context, id string) (logs 
 			"id", id,
 			"logs", logs,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -133,6 +142,7 @@ func (mw loggingMiddleware) GetDeviceCert(ctx context.Context, id string) (cert 
 			"id", id,
 			"cert", cert,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -146,6 +156,7 @@ func (mw loggingMiddleware) GetDeviceCertHistory(ctx context.Context, id string)
 			"id", id,
 			"histo", histo,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -157,6 +168,7 @@ func (mw loggingMiddleware) GetDmsCertHistoryThirtyDays(ctx context.Context) (ce
 			"method", "GetDmsCertHistoryThirtyDays",
 			"histo", certHisto,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())
@@ -168,6 +180,7 @@ func (mw loggingMiddleware) GetDmsLastIssuedCert(ctx context.Context) (dmsLastIs
 			"method", "GetDmsLastIssuedCert",
 			"dmsLastIssued", dmsLastIssued,
 			"took", time.Since(begin),
+			"trace_id", opentracing.SpanFromContext(ctx),
 			"err", err,
 		)
 	}(time.Now())

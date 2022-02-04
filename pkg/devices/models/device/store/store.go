@@ -1,24 +1,28 @@
 package store
 
-import "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+import (
+	"context"
+
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
+)
 
 type DB interface {
-	InsertDevice(d device.Device) error
-	SelectDeviceById(id string) (device.Device, error)
-	SelectAllDevices() (device.Devices, error)
-	SelectAllDevicesByDmsId(dms_id string) (device.Devices, error)
-	UpdateDeviceStatusByID(id string, newStatus string) error
-	UpdateDeviceCertificateSerialNumberByID(id string, serialNumber string) error
-	DeleteDevice(id string) error
+	InsertDevice(ctx context.Context, d device.Device) error
+	SelectDeviceById(ctx context.Context, id string) (device.Device, error)
+	SelectAllDevices(ctx context.Context) (device.Devices, error)
+	SelectAllDevicesByDmsId(ctx context.Context, dms_id string) (device.Devices, error)
+	UpdateDeviceStatusByID(ctx context.Context, id string, newStatus string) error
+	UpdateDeviceCertificateSerialNumberByID(ctx context.Context, id string, serialNumber string) error
+	DeleteDevice(ctx context.Context, id string) error
 
-	InsertLog(l device.DeviceLog) error
-	SelectDeviceLogs(id string) (device.DeviceLogs, error)
+	InsertLog(ctx context.Context, l device.DeviceLog) error
+	SelectDeviceLogs(ctx context.Context, id string) (device.DeviceLogs, error)
 
-	InsertDeviceCertHistory(l device.DeviceCertHistory) error
-	SelectDeviceCertHistory(deviceId string) (device.DeviceCertsHistory, error)
-	SelectDeviceCertHistoryBySerialNumber(serialNumber string) (device.DeviceCertHistory, error)
-	SelectDeviceCertHistoryLastThirtyDays() (device.DeviceCertsHistory, error)
-	UpdateDeviceCertHistory(deviceId string, serialNumber string, newStatus string) error
+	InsertDeviceCertHistory(ctx context.Context, l device.DeviceCertHistory) error
+	SelectDeviceCertHistory(ctx context.Context, deviceId string) (device.DeviceCertsHistory, error)
+	SelectDeviceCertHistoryBySerialNumber(ctx context.Context, serialNumber string) (device.DeviceCertHistory, error)
+	SelectDeviceCertHistoryLastThirtyDays(ctx context.Context) (device.DeviceCertsHistory, error)
+	UpdateDeviceCertHistory(ctx context.Context, deviceId string, serialNumber string, newStatus string) error
 
-	SelectDmssLastIssuedCert() (device.DMSsLastIssued, error)
+	SelectDmssLastIssuedCert(ctx context.Context) (device.DMSsLastIssued, error)
 }

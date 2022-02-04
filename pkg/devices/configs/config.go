@@ -3,33 +3,26 @@ package configs
 import "github.com/kelseyhightower/envconfig"
 
 type Config struct {
-	Port string
+	Port             string `required:"true" split_words:"true"`
+	Protocol         string `required:"true" split_words:"true"`
+	PostgresUser     string `required:"true" split_words:"true"`
+	PostgresDB       string `required:"true" split_words:"true"`
+	PostgresPassword string `required:"true" split_words:"true"`
+	PostgresHostname string `required:"true" split_words:"true"`
+	PostgresPort     string `required:"true" split_words:"true"`
 
-	PostgresUser     string
-	PostgresDB       string
-	PostgresPassword string
-	PostgresHostname string
-	PostgresPort     string
+	CACertFile   string `required:"true" split_words:"true"`
+	CAServerAddr string `required:"true" split_words:"true"`
 
-	ConsulProtocol string
-	ConsulHost     string
-	ConsulPort     string
-	ConsulCA       string
+	LamassuCACertFile string `split_words:"true"`
+	LamassuCAAddress  string `split_words:"true"`
 
-	KeycloakHostname     string
-	KeycloakPort         string
-	KeycloakProtocol     string
-	KeycloakRealm        string
-	KeycloakCA           string
-	KeycloakClientId     string
-	KeycloakClientSecret string
+	MutualTLSEnabled  bool   `split_words:"true"`
+	MutualTLSClientCA string `split_words:"true"`
 
-	CACertfile   string
-	CAServerAddr string
-
-	CertFile            string
-	KeyFile             string
-	MinimumReenrollDays string
+	CertFile            string `required:"true" split_words:"true"`
+	KeyFile             string `required:"true" split_words:"true"`
+	MinimumReenrollDays string `required:"true" split_words:"true"`
 }
 
 func NewConfig(prefix string) (error, Config) {

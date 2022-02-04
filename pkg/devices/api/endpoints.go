@@ -114,7 +114,7 @@ func MakePostDeviceEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(postDeviceRequest)
 		device, e := s.PostDevice(ctx, req.Device)
-		return postDeviceResponse{Device: device, Err: e}, nil
+		return device, e
 	}
 }
 

@@ -5,9 +5,8 @@ WORKDIR /app/cmd/devices
 ENV GOSUMDB=off
 RUN go mod tidy
 WORKDIR /app
-RUN CGO_ENABLED=0 go build -o devices ./cmd/devices/main.go
+RUN CGO_ENABLED=0 go build -o devices ./cmd/main.go
 
-FROM alpine:3.14
+FROM scratch
 COPY --from=0 /app/devices /
-COPY ./est-config.json /app/clientcas.json
 CMD ["/devices"]

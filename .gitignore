@@ -5,6 +5,8 @@ data/*
 #####################################################################
 
 nogit
+local
+.vscode
 
 # Binaries for programs and plugins
 *.exe

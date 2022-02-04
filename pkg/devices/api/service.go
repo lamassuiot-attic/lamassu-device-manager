@@ -6,19 +6,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"net/url"
-	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
-
+	lamassucaclient "github.com/lamassuiot/lamassu-ca/client"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device"
 	devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
@@ -41,15 +34,10 @@ type Service interface {
 }
 
 type devicesService struct {
-	mtx                  sync.RWMutex
-	devicesDb            devicesStore.DB
-	logger               log.Logger
-	caClient             *http.Client
-	caUrl                string
-	keycloakClient       *http.Client
-	keycloakUrl          string
-	keycloakClientId     string
-	keycloakClientSecret string
+	mtx             sync.RWMutex
+	devicesDb       devicesStore.DB
+	logger          log.Logger
+	lamassuCaClient lamassucaclient.LamassuCaClient
 }
 
 var (
@@ -66,15 +54,12 @@ var (
 	ErrResponseEncode   = errors.New("error encoding response")
 )
 
-func NewDevicesService(devicesDb devicesStore.DB, caClient *http.Client, caUrl string, keycloakClient *http.Client, keycloakUrl string, keycloakClientId string, keycloakClientSecret string) Service {
+func NewDevicesService(devicesDb devicesStore.DB, lamassuCa *lamassucaclient.LamassuCaClient, logger log.Logger) Service {
+
 	return &devicesService{
-		devicesDb:            devicesDb,
-		caClient:             caClient,
-		caUrl:                caUrl,
-		keycloakClient:       keycloakClient,
-		keycloakUrl:          keycloakUrl,
-		keycloakClientId:     keycloakClientId,
-		keycloakClientSecret: keycloakClientSecret,
+		devicesDb:       devicesDb,
+		lamassuCaClient: *lamassuCa,
+		logger:          logger,
 	}
 }
 
@@ -84,7 +69,7 @@ func (s *devicesService) Health(ctx context.Context) bool {
 
 func (s *devicesService) PostDevice(ctx context.Context, device devicesModel.Device) (devicesModel.Device, error) {
 	device.KeyStrength = getKeyStrength(device.KeyType, device.KeyBits)
-	err := s.devicesDb.InsertDevice(device)
+	err := s.devicesDb.InsertDevice(ctx, device)
 	if err != nil {
 		return devicesModel.Device{}, err
 	}
@@ -94,7 +79,7 @@ func (s *devicesService) PostDevice(ctx context.Context, device devicesModel.Dev
 		LogType:    devicesModel.LogDeviceCreated,
 		LogMessage: "",
 	}
-	err = s.devicesDb.InsertLog(log)
+	err = s.devicesDb.InsertLog(ctx, log)
 	if err != nil {
 		return devicesModel.Device{}, err
 	}
@@ -103,12 +88,12 @@ func (s *devicesService) PostDevice(ctx context.Context, device devicesModel.Dev
 		LogType:    devicesModel.LogPendingProvision,
 		LogMessage: "",
 	}
-	err = s.devicesDb.InsertLog(log)
+	err = s.devicesDb.InsertLog(ctx, log)
 	if err != nil {
 		return devicesModel.Device{}, err
 	}
 
-	device, err = s.devicesDb.SelectDeviceById(device.Id)
+	device, err = s.devicesDb.SelectDeviceById(ctx, device.Id)
 	if err != nil {
 		return devicesModel.Device{}, err
 	}
@@ -116,7 +101,7 @@ func (s *devicesService) PostDevice(ctx context.Context, device devicesModel.Dev
 }
 
 func (s *devicesService) GetDevices(ctx context.Context) (devicesModel.Devices, error) {
-	devices, err := s.devicesDb.SelectAllDevices()
+	devices, err := s.devicesDb.SelectAllDevices(ctx)
 	if err != nil {
 		return devicesModel.Devices{}, err
 	}
@@ -125,7 +110,7 @@ func (s *devicesService) GetDevices(ctx context.Context) (devicesModel.Devices, 
 }
 
 func (s *devicesService) GetDevicesByDMS(ctx context.Context, dmsId string) (devicesModel.Devices, error) {
-	devices, err := s.devicesDb.SelectAllDevicesByDmsId(dmsId)
+	devices, err := s.devicesDb.SelectAllDevicesByDmsId(ctx, dmsId)
 	if err != nil {
 		return devicesModel.Devices{}, err
 	}
@@ -133,7 +118,7 @@ func (s *devicesService) GetDevicesByDMS(ctx context.Context, dmsId string) (dev
 	return devices, nil
 }
 func (s *devicesService) GetDeviceById(ctx context.Context, deviceId string) (devicesModel.Device, error) {
-	device, err := s.devicesDb.SelectDeviceById(deviceId)
+	device, err := s.devicesDb.SelectDeviceById(ctx, deviceId)
 	if err != nil {
 		return devicesModel.Device{}, err
 	}
@@ -150,7 +135,7 @@ func (s *devicesService) DeleteDevice(ctx context.Context, id string) error {
 			return err
 		}
 	*/
-	err := s.devicesDb.UpdateDeviceStatusByID(id, devicesModel.DeviceDecommisioned)
+	err := s.devicesDb.UpdateDeviceStatusByID(ctx, id, devicesModel.DeviceDecommisioned)
 	if err != nil {
 		return err
 	}
@@ -160,7 +145,7 @@ func (s *devicesService) DeleteDevice(ctx context.Context, id string) error {
 		LogType:    devicesModel.LogDeviceDecommisioned,
 		LogMessage: "",
 	}
-	err = s.devicesDb.InsertLog(log)
+	err = s.devicesDb.InsertLog(ctx, log)
 	if err != nil {
 		return err
 	}
@@ -168,7 +153,7 @@ func (s *devicesService) DeleteDevice(ctx context.Context, id string) error {
 }
 
 func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revocationReason string) error {
-	dev, err := s.devicesDb.SelectDeviceById(id)
+	dev, err := s.devicesDb.SelectDeviceById(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -177,48 +162,33 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revoca
 		return errors.New("The device has no cert")
 	}
 
-	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(dev.CurrentCertSerialNumber)
+	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, dev.CurrentCertSerialNumber)
 	if err != nil {
 		return err
 	}
 
-	keycloakToken, err := s.getKeycloakToken()
 	if err != nil {
 		return err
 	}
 
 	serialNumberToRevoke := currentCertHistory.SerialNumber
 	// revoke
-	req, err := http.NewRequest(
-		"DELETE",
-		s.caUrl+"/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+serialNumberToRevoke,
-		nil,
-	)
+	err = s.lamassuCaClient.RevokeCert(ctx, currentCertHistory.IsuuerName, serialNumberToRevoke, "pki")
+
+	if err != nil {
+		return err
+	}
+	err = s.devicesDb.UpdateDeviceCertHistory(ctx, id, dev.CurrentCertSerialNumber, devicesModel.CertHistoryRevoked)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Add("Accept", "application/json")
-
-	req.Header.Add("Authorization", keycloakToken)
-	_ = req.WithContext(ctx)
-
-	resp, err := s.caClient.Do(req)
-	if err != nil {
-		return err
-	}
-	fmt.Println(resp)
-	err = s.devicesDb.UpdateDeviceCertHistory(id, dev.CurrentCertSerialNumber, devicesModel.CertHistoryRevoked)
+	err = s.devicesDb.UpdateDeviceStatusByID(ctx, id, devicesModel.DeviceCertRevoked)
 	if err != nil {
 		return err
 	}
 
-	err = s.devicesDb.UpdateDeviceStatusByID(id, devicesModel.DeviceCertRevoked)
-	if err != nil {
-		return err
-	}
-
-	err = s.devicesDb.UpdateDeviceCertificateSerialNumberByID(id, "")
+	err = s.devicesDb.UpdateDeviceCertificateSerialNumberByID(ctx, id, "")
 	if err != nil {
 		return err
 	}
@@ -228,7 +198,7 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revoca
 		LogType:    devicesModel.LogCertRevoked,
 		LogMessage: revocationReason + ". Certificate with Serial Number " + serialNumberToRevoke + " revoked.",
 	}
-	err = s.devicesDb.InsertLog(log)
+	err = s.devicesDb.InsertLog(ctx, log)
 	if err != nil {
 		return err
 	}
@@ -236,7 +206,7 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revoca
 }
 
 func (s *devicesService) GetDeviceLogs(ctx context.Context, id string) (devicesModel.DeviceLogs, error) {
-	logs, err := s.devicesDb.SelectDeviceLogs(id)
+	logs, err := s.devicesDb.SelectDeviceLogs(ctx, id)
 	if err != nil {
 		return devicesModel.DeviceLogs{}, err
 	}
@@ -244,7 +214,7 @@ func (s *devicesService) GetDeviceLogs(ctx context.Context, id string) (devicesM
 }
 
 func (s *devicesService) GetDeviceCertHistory(ctx context.Context, id string) (devicesModel.DeviceCertsHistory, error) {
-	history, err := s.devicesDb.SelectDeviceCertHistory(id)
+	history, err := s.devicesDb.SelectDeviceCertHistory(ctx, id)
 	if err != nil {
 		return devicesModel.DeviceCertsHistory{}, err
 	}
@@ -252,7 +222,7 @@ func (s *devicesService) GetDeviceCertHistory(ctx context.Context, id string) (d
 }
 
 func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesModel.DeviceCert, error) {
-	dev, err := s.devicesDb.SelectDeviceById(id)
+	dev, err := s.devicesDb.SelectDeviceById(ctx, id)
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
 	}
@@ -261,66 +231,39 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 		return devicesModel.DeviceCert{}, errors.New("The device has no cert")
 	}
 
-	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(dev.CurrentCertSerialNumber)
+	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, dev.CurrentCertSerialNumber)
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
 	}
 
-	keycloakToken, err := s.getKeycloakToken()
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
 	}
+	cert, err := s.lamassuCaClient.GetCert(ctx, currentCertHistory.IsuuerName, currentCertHistory.SerialNumber, "pki")
 
-	req, err := http.NewRequest(
-		"GET",
-		s.caUrl+"/v1/cas/"+currentCertHistory.IsuuerName+"/cert/"+currentCertHistory.SerialNumber,
-		nil,
-	)
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
-	}
-
-	req.Header.Add("Accept", "application/json")
-	//reqToken := ctx.Value(jwt.JWTTokenContextKey)
-
-	req.Header.Add("Authorization", keycloakToken)
-	_ = req.WithContext(ctx)
-
-	response, err := s.caClient.Do(req)
-	if err != nil {
-		return devicesModel.DeviceCert{}, err
-	}
-	defer response.Body.Close()
-
-	var data map[string]interface{}
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not parse response body")
-	}
-	err = json.Unmarshal(body, &data)
-	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not parse response json")
 	}
 
 	return devicesModel.DeviceCert{
 		DeviceId:     id,
-		SerialNumber: data["serial_number"].(string),
-		Status:       data["status"].(string),
-		CAName:       data["ca_name"].(string),
-		CRT:          data["crt"].(string),
-		Country:      data["country"].(string),
-		State:        data["state"].(string),
-		Locality:     data["locality"].(string),
-		Org:          data["organization"].(string),
-		OrgUnit:      data["organization_unit"].(string),
-		CommonName:   data["common_name"].(string),
-		ValidFrom:    data["valid_from"].(string),
-		ValidTo:      data["valid_to"].(string),
+		SerialNumber: cert.SerialNumber,
+		Status:       cert.Status,
+		CAName:       cert.CAName,
+		CRT:          cert.CertContent.CerificateBase64,
+		Country:      cert.Subject.C,
+		State:        cert.Subject.ST,
+		Locality:     cert.Subject.L,
+		Org:          cert.Subject.O,
+		OrgUnit:      cert.Subject.OU,
+		CommonName:   cert.Subject.CN,
+		ValidFrom:    cert.ValidFrom,
+		ValidTo:      cert.ValidTo,
 	}, nil
 }
 
 func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context) (devicesModel.DMSCertsHistory, error) {
-	devices, err := s.devicesDb.SelectAllDevices()
+	devices, err := s.devicesDb.SelectAllDevices(ctx)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Could not get devices from DB")
 		return devicesModel.DMSCertsHistory{}, err
@@ -332,7 +275,7 @@ func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context) (devic
 		deviceDmsMap[dev.Id] = dev.DmsId
 	}
 
-	certHistory, err := s.devicesDb.SelectDeviceCertHistoryLastThirtyDays()
+	certHistory, err := s.devicesDb.SelectDeviceCertHistoryLastThirtyDays(ctx)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Could not get last 30 days issued certs from DB")
 		return devicesModel.DMSCertsHistory{}, err
@@ -362,7 +305,7 @@ func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context) (devic
 }
 
 func (s *devicesService) GetDmsLastIssuedCert(ctx context.Context) (devicesModel.DMSsLastIssued, error) {
-	lastIssued, err := s.devicesDb.SelectDmssLastIssuedCert()
+	lastIssued, err := s.devicesDb.SelectDmssLastIssuedCert(ctx)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Could not get devices from DB")
 		return devicesModel.DMSsLastIssued{}, err
@@ -391,44 +334,6 @@ func getKeyStrength(keyType string, keyBits int) string {
 		}
 	}
 	return keyStrength
-}
-
-func (s *devicesService) getKeycloakToken() (string, error) {
-	urlEncodedData := url.Values{}
-	urlEncodedData.Set("grant_type", "client_credentials")
-	urlEncodedData.Set("client_id", s.keycloakClientId)
-	urlEncodedData.Set("client_secret", s.keycloakClientSecret)
-
-	reqAuthApi, err := http.NewRequest(
-		"POST",
-		s.keycloakUrl+"/protocol/openid-connect/token",
-		strings.NewReader(urlEncodedData.Encode()),
-	)
-	reqAuthApi.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-	reqAuthApi.Header.Add("Content-Length", strconv.Itoa(len(urlEncodedData.Encode())))
-
-	if err != nil {
-		return "", err
-	}
-
-	authResponse, err := s.keycloakClient.Do(reqAuthApi)
-	if err != nil {
-		return "", err
-	}
-	defer authResponse.Body.Close()
-
-	var authData map[string]interface{}
-	authBody, err := ioutil.ReadAll(authResponse.Body)
-	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not parse response body")
-	}
-	err = json.Unmarshal(authBody, &authData)
-	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not parse response json")
-	}
-
-	reqToken := authData["access_token"]
-	return fmt.Sprintf("Bearer %s", reqToken), nil
 }
 
 func _generateCSR(ctx context.Context, keyType string, priv interface{}, commonName string, country string, state string, locality string, org string, orgUnit string) ([]byte, error) {
