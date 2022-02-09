@@ -132,7 +132,7 @@ func (s *EstService) Enroll(ctx context.Context, csr *x509.CertificateRequest, a
 		return nil, errors.New(err)
 	}
 
-	dataCert, err := s.lamassuCaClient.SignCertificateRequest(ctx, aps, csr, "pki")
+	dataCert, err := s.lamassuCaClient.SignCertificateRequest(ctx, aps, csr, "pki", true)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Error in client request")
 		return &x509.Certificate{}, err
@@ -235,7 +235,7 @@ func (s *EstService) Reenroll(ctx context.Context, cert *x509.Certificate, csr *
 		return nil, errors.New(errMsg)
 	}
 
-	dataCert, err := s.lamassuCaClient.SignCertificateRequest(ctx, aps, csr, "pki")
+	dataCert, err := s.lamassuCaClient.SignCertificateRequest(ctx, aps, csr, "pki", true)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Error in client request")
 		return &x509.Certificate{}, err
@@ -314,7 +314,7 @@ func (s *EstService) ServerKeyGen(ctx context.Context, csr *x509.CertificateRequ
 		return nil, nil, fmt.Errorf("failed to generate new csr: %v", err)
 	}
 
-	dataCert, err := s.lamassuCaClient.SignCertificateRequest(ctx, aps, csr, "pki")
+	dataCert, err := s.lamassuCaClient.SignCertificateRequest(ctx, aps, csr, "pki", true)
 	if err != nil {
 		level.Error(s.logger).Log("err", err, "msg", "Error in client request")
 		return &x509.Certificate{}, nil, err
