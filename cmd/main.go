@@ -8,31 +8,30 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
 	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/go-openapi/runtime/middleware"
-	lamassucaclient "github.com/lamassuiot/lamassu-ca/client"
-	"github.com/lamassuiot/lamassu-ca/pkg/utils"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/api"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/configs"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/docs"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/estserver"
-	devicesDb "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store/db"
-	verify "github.com/lamassuiot/lamassu-device-manager/pkg/devices/utils"
-	"github.com/opentracing/opentracing-go"
+	lamassucaclient "github.com/lamassuiot/lamassu-ca/pkg/client"
+	"github.com/lamassuiot/lamassu-ca/pkg/server/utils"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/configs"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/docs"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/estserver"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/service"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/transport"
+	devicesDb "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device/store/db"
+	verify "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/utils"
+	"github.com/opentracing/opentracing-go"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	jaegercfg "github.com/uber/jaeger-client-go/config"
 	jaegerlog "github.com/uber/jaeger-client-go/log"
-	"gopkg.in/yaml.v2"
 )
 
 func main() {
@@ -84,11 +83,11 @@ func main() {
 
 	verify := verify.NewUtils(&lamassuCaClient, logger)
 
-	var s api.Service
+	var s service.Service
 	{
-		s = api.NewDevicesService(devicesDb, &lamassuCaClient, logger)
-		s = api.LoggingMiddleware(logger)(s)
-		s = api.NewInstrumentingMiddleware(
+		s = service.NewDevicesService(devicesDb, &lamassuCaClient, logger)
+		s = service.LoggingMiddleware(logger)(s)
+		s = service.NewInstrumentingMiddleware(
 			kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
 				Namespace: "enroller",
 				Subsystem: "enroller_service",
@@ -104,41 +103,37 @@ func main() {
 		)(s)
 	}
 	openapiSpec := docs.NewOpenAPI3(cfg)
-
-	openapiSpecJsonData, _ := json.Marshal(&openapiSpec)
-	openapiSpecYamlData, _ := yaml.Marshal(&openapiSpec)
-
 	err = os.MkdirAll("docs", 0744)
 	if err != nil {
 		level.Error(logger).Log("err", err, "msg", "Could not create openapiv3 docs dir")
 		os.Exit(1)
 	}
 
-	err = os.WriteFile(path.Join("docs", "openapiv3.json"), openapiSpecJsonData, 0644)
-	if err != nil {
-		level.Error(logger).Log("err", err, "msg", "Could not create openapiv3 JSON spec file")
-		os.Exit(1)
-	}
-	err = os.WriteFile(path.Join("docs", "openapiv3.yaml"), openapiSpecYamlData, 0644)
-	if err != nil {
-		level.Error(logger).Log("err", err, "msg", "Could not create openapiv3 YAML spec file")
-		os.Exit(1)
-	}
 	var ctx context.Context
 	mux := http.NewServeMux()
 	minimumReenrollDays, err := strconv.Atoi(cfg.MinimumReenrollDays)
 	estService := estserver.NewEstService(&lamassuCaClient, &verify, devicesDb, minimumReenrollDays, logger)
-	mux.Handle("/.well-known/", estserver.MakeHTTPHandler(estService, verify, log.With(logger, "component", "HTTPS"), cfg, tracer, ctx))
 
-	http.Handle("/", accessControl(mux))
-	mux.Handle("/", http.FileServer(http.Dir("./docs")))
-	mux.Handle("/v1/", api.MakeHTTPHandler(s, log.With(logger, "component", "HTTPS"), tracer))
-	mux.Handle("/v1/docs", middleware.SwaggerUI(middleware.SwaggerUIOpts{
-		BasePath: "/v1",
-		SpecURL:  path.Join("/openapiv3.json"),
-		Path:     "docs",
-	}, mux))
+	specHandler := func(prefix string) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			url := r.URL.Path
+			if originalPrefix, ok := r.Header["X-Envoy-Original-Path"]; ok {
+				url = originalPrefix[0]
+			}
+			url = strings.Split(url, prefix)[0]
+			openapiSpec.Servers[0].URL = url
+			openapiSpecJsonData, _ := json.Marshal(&openapiSpec)
+			w.Write(openapiSpecJsonData)
+		}
+	}
 
+	http.Handle("/.well-known/", accessControl(estserver.MakeHTTPHandler(estService, verify, log.With(logger, "component", "HTTPS"), cfg, tracer, ctx)))
+	http.Handle("/v1/", accessControl(transport.MakeHTTPHandler(s, log.With(logger, "component", "HTTPS"), tracer)))
+	http.Handle("/v1/docs/", http.StripPrefix("/v1/docs", middleware.SwaggerUI(middleware.SwaggerUIOpts{
+		Path:    "/",
+		SpecURL: "spec.json",
+	}, mux)))
+	http.HandleFunc("/v1/docs/spec.json", specHandler("/v1/docs/"))
 	http.Handle("/metrics", promhttp.Handler())
 
 	errs := make(chan error)
@@ -191,6 +186,7 @@ func main() {
 
 func accessControl(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, DELETE")
 		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
