@@ -46,19 +46,6 @@ func TestHealth(t *testing.T) {
 
 func TestGetDeviceCert(t *testing.T) {
 	srv, ctx := setup(t)
-	/*subject := devicesModel.Subject{
-		C:  "ES",
-		ST: "Guipuzcoa",
-		L:  "Mondragon",
-		O:  "Ikerlan",
-		OU: "ZPD",
-		CN: "testDeviceMock",
-	}
-	key := devicesModel.PrivateKeyMetadata{
-		KeyType: "rsa",
-		KeyBits: 3072,
-	}
-	dNoSerialNumer, _ := srv.PostDevice(ctx, "noSN", "noSN", 1, key, subject)*/
 	d := testGetDeviceCert()
 	dErrorId := d
 	dErrorId.DeviceId = "errorDeviceById"
@@ -73,7 +60,7 @@ func TestGetDeviceCert(t *testing.T) {
 	}{
 		{"Error getting cert", "error", d, errors.New("Error getting certificate")},
 		{"Error finding device", "errorDeviceById", dErrorId, errors.New("Could not find device by Id")},
-		{"Error empty serial number", "noSerialNumber", dErrorEmptySerialNumber, errors.New("No Serial Number")},
+		{"Error empty serial number", "noSerialNumber", dErrorEmptySerialNumber, errors.New("The device has no certificate")},
 		{"Error certificate history could not find", "error", d, errors.New("Testing DB connection failed")},
 		{"Correct", "1", d, nil},
 	}
@@ -485,6 +472,12 @@ func TestPostDevice(t *testing.T) {
 				KeyType: "rsa",
 				KeyBits: 3072,
 			}
+			if tc.name == "Error Inserting Log" {
+				ctx = context.WithValue(ctx, "DBInsertLog", true)
+			} else {
+				ctx = context.WithValue(ctx, "DBInsertLog", false)
+			}
+
 			out, err := srv.PostDevice(ctx, tc.in.Alias, tc.in.Id, tc.in.DmsId, key, tc.in.Subject)
 			if err != nil {
 				if err.Error() != tc.err.Error() {

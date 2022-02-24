@@ -24,12 +24,12 @@ const (
 )
 
 var (
-	ErrPeerCertificatesContextMissing = errors.New("token up for parsing was not passed through the context")
+	ErrPeerCertificatesContextMissing = errors.New("certificate up for parsing was not passed through the context")
 )
 
 func HTTPToContext() http.RequestFunc {
 	return func(ctx context.Context, r *stdhttp.Request) context.Context {
-		ClientCert := r.Header.Get("X-Forwarded-Client-Cert")
+		ClientCert := r.Header.Get("x-forwarded-client-cert")
 		if len(ClientCert) > 0 {
 			splits := strings.Split(ClientCert, ";")
 			Cert := splits[1]
