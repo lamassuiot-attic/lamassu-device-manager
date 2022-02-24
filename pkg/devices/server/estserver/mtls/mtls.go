@@ -29,7 +29,7 @@ var (
 
 func HTTPToContext() http.RequestFunc {
 	return func(ctx context.Context, r *stdhttp.Request) context.Context {
-		ClientCert := r.Header.Get("x-forwarded-client-cert")
+		ClientCert := r.Header.Get("X-Forwarded-Client-Cert")
 		if len(ClientCert) > 0 {
 			splits := strings.Split(ClientCert, ";")
 			Cert := splits[1]
@@ -53,8 +53,8 @@ func NewParser(enroll bool, verify utils.Utils, cfg configs.Config, ctx context.
 			XForCert, _ := ctx.Value(XForwardedCertifcate).(*x509.Certificate)
 			peerCert, _ := ctx.Value(PeerCertificatesContextKey).(*x509.Certificate)
 			if XForCert != nil {
-				_ = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: peerCert.Raw})
-				_, err = verify.VerifyPeerCertificate(ctx, peerCert, enroll, nil)
+				_ = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: XForCert.Raw})
+				_, err = verify.VerifyPeerCertificate(ctx, XForCert, enroll, nil)
 				if err != nil {
 					return nil, err
 				}
