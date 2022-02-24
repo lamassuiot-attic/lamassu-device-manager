@@ -214,11 +214,11 @@ type CreateDeviceRequest struct {
 	DmsId    int    `json:"dms_id" validate:"required"`
 	Subject  struct {
 		CN string `json:"common_name" validate:"required"`
-		O  string `json:"organization" validate:"required"`
-		OU string `json:"organization_unit" validate:"required"`
-		C  string `json:"country" validate:"required"`
-		ST string `json:"state" validate:"required"`
-		L  string `json:"locality" validate:"required"`
+		O  string `json:"organization"`
+		OU string `json:"organization_unit"`
+		C  string `json:"country"`
+		ST string `json:"state"`
+		L  string `json:"locality"`
 	} `json:"subject"`
 	KeyMetadata struct {
 		KeyType string `json:"type" validate:"oneof='rsa' 'ecdsa'"`

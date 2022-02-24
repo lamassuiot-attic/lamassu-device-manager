@@ -21,7 +21,7 @@ require (
 	github.com/hashicorp/consul/api v1.12.0
 	github.com/hashicorp/go-hclog v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/lamassuiot/lamassu-ca v1.0.12
+	github.com/lamassuiot/lamassu-ca v1.0.13
 	github.com/lamassuiot/lamassu-est v0.2.4
 	github.com/lib/pq v1.10.3
 	github.com/mattn/go-colorable v0.1.11 // indirect
