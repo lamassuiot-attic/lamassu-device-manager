@@ -210,7 +210,7 @@ type HealthResponse struct {
 
 type CreateDeviceRequest struct {
 	DeviceID string `json:"id" validate:"required"`
-	Alias    string `json:"alias" validate:"required"`
+	Alias    string `json:"alias"`
 	DmsId    int    `json:"dms_id" validate:"required"`
 	Subject  struct {
 		CN string `json:"common_name" validate:"required"`
