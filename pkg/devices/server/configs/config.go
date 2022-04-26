@@ -3,13 +3,15 @@ package configs
 import "github.com/kelseyhightower/envconfig"
 
 type Config struct {
-	Port             string `required:"true" split_words:"true"`
-	Protocol         string `required:"true" split_words:"true"`
-	PostgresUser     string `required:"true" split_words:"true"`
-	PostgresDB       string `required:"true" split_words:"true"`
-	PostgresPassword string `required:"true" split_words:"true"`
-	PostgresHostname string `required:"true" split_words:"true"`
-	PostgresPort     string `required:"true" split_words:"true"`
+	Port                       string `required:"true" split_words:"true"`
+	Protocol                   string `required:"true" split_words:"true"`
+	PostgresUser               string `required:"true" split_words:"true"`
+	PostgresDevicesDB          string `required:"true" split_words:"true"`
+	PostgresDmsDB              string `required:"true" split_words:"true"`
+	PostgresPassword           string `required:"true" split_words:"true"`
+	PostgresHostname           string `required:"true" split_words:"true"`
+	PostgresPort               string `required:"true" split_words:"true"`
+	PostgresMigrationsFilePath string `required:"true" split_words:"true"`
 
 	CACertFile   string `required:"true" split_words:"true"`
 	CAServerAddr string `required:"true" split_words:"true"`
@@ -19,6 +21,8 @@ type Config struct {
 
 	MutualTLSEnabled  bool   `split_words:"true"`
 	MutualTLSClientCA string `split_words:"true"`
+
+	DebugMode string `required:"true" split_words:"true"`
 
 	CertFile            string `required:"true" split_words:"true"`
 	KeyFile             string `required:"true" split_words:"true"`

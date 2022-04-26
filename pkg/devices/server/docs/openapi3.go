@@ -56,6 +56,15 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 				WithProperty("strength", openapi3.NewStringSchema()).
 				WithProperty("bits", openapi3.NewIntegerSchema()),
 		),
+		"tags": openapi3.NewSchemaRef("",
+			openapi3.NewStringSchema(),
+		),
+		"CurrentCertificate": openapi3.NewSchemaRef("",
+			openapi3.NewObjectSchema().
+				WithProperty("serial_number", openapi3.NewStringSchema()).
+				WithProperty("valid_to", openapi3.NewStringSchema()).
+				WithProperty("crt", openapi3.NewStringSchema()),
+		),
 
 		"Subject": openapi3.NewSchemaRef("",
 			openapi3.NewObjectSchema().
@@ -84,13 +93,15 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 					Ref: "#/components/schemas/KeyMetadata",
 				}).
 				WithProperty("creation_timestamp", openapi3.NewStringSchema()).
-				WithProperty("current_cert_serial_number", openapi3.NewStringSchema()),
+				WithProperty("modification_timestamp", openapi3.NewStringSchema()).
+				WithPropertyRef("current_certificate", &openapi3.SchemaRef{
+					Ref: "#/components/schemas/CurrentCertificate",
+				}),
 		),
 		"DeviceCertHistory": openapi3.NewSchemaRef("",
 			openapi3.NewObjectSchema().
 				WithProperty("device_id", openapi3.NewStringSchema()).
 				WithProperty("serial_number", openapi3.NewStringSchema()).
-				WithProperty("issuer_serial_number", openapi3.NewStringSchema()).
 				WithProperty("issuer_name", openapi3.NewStringSchema()).
 				WithProperty("status", openapi3.NewStringSchema()).
 				WithProperty("creation_timestamp", openapi3.NewStringSchema()),
@@ -121,18 +132,35 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 	openapiSpec.Components.RequestBodies = openapi3.RequestBodies{
 		"PostDeviceRequest": &openapi3.RequestBodyRef{
 			Value: openapi3.NewRequestBody().
-				WithDescription("Request used for creating a new Certificate Authority").
+				WithDescription("Request used for creating a new device").
 				WithRequired(true).
 				WithJSONSchema(openapi3.NewSchema().
 					WithProperty("id", openapi3.NewStringSchema()).
 					WithProperty("alias", openapi3.NewStringSchema()).
-					WithProperty("dms_id", openapi3.NewIntegerSchema()).
-					WithPropertyRef("subject", &openapi3.SchemaRef{
-						Ref: "#/components/schemas/Subject",
-					}).
-					WithPropertyRef("key_metadata", &openapi3.SchemaRef{
-						Ref: "#/components/schemas/KeyMetadata",
-					}),
+					WithProperty("description", openapi3.NewStringSchema()).
+					WithPropertyRef("tags", arrayOf(&openapi3.SchemaRef{
+						Ref: "#/components/schemas/tags",
+					})).
+					WithProperty("icon_name", openapi3.NewStringSchema()).
+					WithProperty("icon_color", openapi3.NewStringSchema()).
+					WithProperty("dms_id", openapi3.NewStringSchema()),
+				),
+		},
+
+		"UpdateDeviceRequest": &openapi3.RequestBodyRef{
+			Value: openapi3.NewRequestBody().
+				WithDescription("Request used for updating").
+				WithRequired(true).
+				WithJSONSchema(openapi3.NewSchema().
+					WithProperty("id", openapi3.NewStringSchema()).
+					WithProperty("alias", openapi3.NewStringSchema()).
+					WithProperty("description", openapi3.NewStringSchema()).
+					WithPropertyRef("tags", arrayOf(&openapi3.SchemaRef{
+						Ref: "#/components/schemas/tags",
+					})).
+					WithProperty("icon_name", openapi3.NewStringSchema()).
+					WithProperty("icon_color", openapi3.NewStringSchema()).
+					WithProperty("dms_id", openapi3.NewStringSchema()),
 				),
 		},
 
@@ -173,16 +201,27 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 		"DeviceResponse": &openapi3.ResponseRef{
 			Value: openapi3.NewResponse().
 				WithDescription("Response returned back after creating a device.").
-				WithContent(openapi3.NewContentWithJSONSchemaRef(&openapi3.SchemaRef{
-					Ref: "#/components/schemas/Device",
-				})),
+				WithContent(openapi3.NewContentWithJSONSchema(openapi3.NewSchema().
+					WithProperty("id", openapi3.NewStringSchema()).
+					WithProperty("alias", openapi3.NewStringSchema()).
+					WithProperty("description", openapi3.NewStringSchema()).
+					WithPropertyRef("tags", arrayOf(&openapi3.SchemaRef{
+						Ref: "#/components/schemas/tags",
+					})).
+					WithProperty("icon_name", openapi3.NewStringSchema()).
+					WithProperty("icon_color", openapi3.NewStringSchema()).
+					WithProperty("dms_id", openapi3.NewStringSchema()),
+				)),
 		},
 		"GetDeviceResponse": &openapi3.ResponseRef{
 			Value: openapi3.NewResponse().
 				WithDescription("Response returned back after creating a device.").
-				WithContent(openapi3.NewContentWithJSONSchemaRef(arrayOf(&openapi3.SchemaRef{
-					Ref: "#/components/schemas/Device",
-				}))),
+				WithContent(openapi3.NewContentWithJSONSchema(openapi3.NewSchema().
+					WithProperty("total_devices", openapi3.NewIntegerSchema()).
+					WithPropertyRef("devices", arrayOf(&openapi3.SchemaRef{
+						Ref: "#/components/schemas/Device",
+					})),
+				)),
 		},
 		"DeleteRevokeResponse": &openapi3.ResponseRef{
 			Value: openapi3.NewResponse().
@@ -251,10 +290,32 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 				},
 			},
 		},
-		"/v1/devices": &openapi3.PathItem{
+		"/v1/devices?": &openapi3.PathItem{
 			Get: &openapi3.Operation{
 				OperationID: "GetDevices",
 				Description: "Get Devices",
+				Parameters: []*openapi3.ParameterRef{
+					{
+						Value: openapi3.NewPathParameter("f").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("order").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("field").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("p").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("offset").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+				},
 				Responses: openapi3.Responses{
 					"400": &openapi3.ResponseRef{
 						Ref: "#/components/responses/ErrorResponse",
@@ -273,6 +334,8 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 					},
 				},
 			},
+		},
+		"/v1/devices": &openapi3.PathItem{
 			Post: &openapi3.Operation{
 				OperationID: "PostDevice",
 				Description: "Post Device",
@@ -298,6 +361,7 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 				},
 			},
 		},
+
 		"/v1/devices/{deviceId}": &openapi3.PathItem{
 			Get: &openapi3.Operation{
 				OperationID: "GetDeviceById",
@@ -322,7 +386,37 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 						Ref: "#/components/responses/ErrorResponse",
 					},
 					"200": &openapi3.ResponseRef{
-						Ref: "#/components/responses/DeviceResponse",
+						Ref: "#/components/responses/GetDeviceResponse",
+					},
+				},
+			},
+			Put: &openapi3.Operation{
+				OperationID: "UpdateDeviceById",
+				Description: "Update Device By Id",
+				Parameters: []*openapi3.ParameterRef{
+					{
+						Value: openapi3.NewPathParameter("deviceId").
+							WithSchema(openapi3.NewStringSchema()),
+					},
+				},
+				RequestBody: &openapi3.RequestBodyRef{
+					Ref: "#/components/requestBodies/UpdateDeviceRequest",
+				},
+				Responses: openapi3.Responses{
+					"400": &openapi3.ResponseRef{
+						Ref: "#/components/responses/ErrorResponse",
+					},
+					"401": &openapi3.ResponseRef{
+						Ref: "#/components/responses/ErrorResponse",
+					},
+					"403": &openapi3.ResponseRef{
+						Ref: "#/components/responses/ErrorResponse",
+					},
+					"500": &openapi3.ResponseRef{
+						Ref: "#/components/responses/ErrorResponse",
+					},
+					"200": &openapi3.ResponseRef{
+						Ref: "#/components/responses/GetDeviceResponse",
 					},
 				},
 			},
@@ -355,6 +449,7 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 				},
 			},
 		},
+
 		"/v1/devices/{deviceId}/revoke": &openapi3.PathItem{
 			Delete: &openapi3.Operation{
 				OperationID: "DeleteRevoke",
@@ -392,6 +487,26 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 					{
 						Value: openapi3.NewPathParameter("deviceId").
 							WithSchema(openapi3.NewStringSchema()),
+					},
+					{
+						Value: openapi3.NewPathParameter("f").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("order").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("field").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("p").
+							WithSchema(openapi3.NewIntegerSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("offset").
+							WithSchema(openapi3.NewIntegerSchema()).WithRequired(false),
 					},
 				},
 				Responses: openapi3.Responses{
@@ -475,6 +590,28 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 			Get: &openapi3.Operation{
 				OperationID: "GetDmsCertHistoryThirtyDays",
 				Description: "Get Dms Cert History of last Thirty Days",
+				Parameters: []*openapi3.ParameterRef{
+					{
+						Value: openapi3.NewPathParameter("f").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("order").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("field").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("p").
+							WithSchema(openapi3.NewIntegerSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("offset").
+							WithSchema(openapi3.NewIntegerSchema()).WithRequired(false),
+					},
+				},
 				Responses: openapi3.Responses{
 					"400": &openapi3.ResponseRef{
 						Ref: "#/components/responses/ErrorResponse",
@@ -494,10 +631,32 @@ func NewOpenAPI3(config configs.Config) openapi3.T {
 				},
 			},
 		},
-		"/v1/devices/dms-cert-history/last-issued": &openapi3.PathItem{
+		"/v1/devices/dms-cert-history/last-issued?": &openapi3.PathItem{
 			Get: &openapi3.Operation{
 				OperationID: "GetDmsLastIssueCert",
 				Description: "Get Dms Cert History of last Thirty Days",
+				Parameters: []*openapi3.ParameterRef{
+					{
+						Value: openapi3.NewPathParameter("f").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("order").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("field").
+							WithSchema(openapi3.NewStringSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("p").
+							WithSchema(openapi3.NewIntegerSchema()).WithRequired(false),
+					},
+					{
+						Value: openapi3.NewPathParameter("offset").
+							WithSchema(openapi3.NewIntegerSchema()).WithRequired(false),
+					},
+				},
 				Responses: openapi3.Responses{
 					"400": &openapi3.ResponseRef{
 						Ref: "#/components/responses/ErrorResponse",

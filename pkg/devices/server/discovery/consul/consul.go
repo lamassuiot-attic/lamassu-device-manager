@@ -26,7 +26,7 @@ func NewServiceDiscovery(consulProtocol string, consulHost string, consulPort st
 	consulConfig.TLSConfig = *tlsConf
 	consulClient, err := api.NewClient(consulConfig)
 	if err != nil {
-		level.Error(logger).Log("err", err, "msg", "Could not start Consul API Client")
+		level.Debug(logger).Log("err", err, "msg", "Could not start Consul API Client")
 		return nil, err
 	}
 	client := consulsd.NewClient(consulClient)

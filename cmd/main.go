@@ -13,19 +13,25 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/go-openapi/runtime/middleware"
-	lamassucaclient "github.com/lamassuiot/lamassu-ca/pkg/client"
-	"github.com/lamassuiot/lamassu-ca/pkg/server/utils"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/configs"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/docs"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/estserver"
-
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
+	"github.com/go-openapi/runtime/middleware"
+
+	migrate "github.com/golang-migrate/migrate/v4"
+	migratePostgres "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	lamassucaclient "github.com/lamassuiot/lamassu-ca/pkg/client"
+	"github.com/lamassuiot/lamassu-ca/pkg/server/utils"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/service"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/transport"
-	devicesDb "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device/store/db"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/configs"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/docs"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/estserver"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device/store"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device/store/db"
+	dmsDb "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/dms/store/db"
 	verify "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/utils"
 	"github.com/opentracing/opentracing-go"
 	stdprometheus "github.com/prometheus/client_golang/prometheus"
@@ -50,6 +56,16 @@ func main() {
 	}
 	level.Info(logger).Log("msg", "Environment configuration values loaded")
 
+	if strings.ToLower(cfg.DebugMode) == "debug" {
+		{
+			logger = log.NewJSONLogger(os.Stdout)
+			logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+			logger = level.NewFilter(logger, level.AllowDebug())
+			logger = log.With(logger, "caller", log.DefaultCaller)
+		}
+		level.Debug(logger).Log("msg", "Starting Lamassu-Device-Manager in debug mode...")
+	}
+
 	jcfg, err := jaegercfg.FromEnv()
 	if err != nil {
 		level.Error(logger).Log("err", err, "msg", "Could not load Jaeger configuration values fron environment")
@@ -68,14 +84,22 @@ func main() {
 	defer closer.Close()
 	level.Info(logger).Log("msg", "Jaeger tracer started")
 
-	devicesConnStr := "dbname=" + cfg.PostgresDB + " user=" + cfg.PostgresUser + " password=" + cfg.PostgresPassword + " host=" + cfg.PostgresHostname + " port=" + cfg.PostgresPort + " sslmode=disable"
-	devicesDb, err := devicesDb.NewDB("postgres", devicesConnStr, logger)
+	devicesDb := initializeDB(cfg.PostgresDevicesDB, cfg.PostgresUser, cfg.PostgresPassword, cfg.PostgresHostname, cfg.PostgresPort, cfg.PostgresMigrationsFilePath, logger)
 	if err != nil {
 		level.Error(logger).Log("err", err, "msg", "Could not start connection with Devices database. Will sleep for 5 seconds and exit the program")
 		time.Sleep(5 * time.Second)
 		os.Exit(1)
 	}
 	level.Info(logger).Log("msg", "Connection established with Devices database")
+
+	dmsConnStr := "dbname=" + cfg.PostgresDmsDB + " user=" + cfg.PostgresUser + " password=" + cfg.PostgresPassword + " host=" + cfg.PostgresHostname + " port=" + cfg.PostgresPort + " sslmode=disable"
+	dmsDb, err := dmsDb.NewDB("postgres", dmsConnStr, logger)
+	if err != nil {
+		level.Error(logger).Log("err", err, "msg", "Could not start connection with DMS database. Will sleep for 5 seconds and exit the program")
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+	level.Info(logger).Log("msg", "Connection established with DMS database")
 
 	fieldKeys := []string{"method", "error"}
 
@@ -112,7 +136,7 @@ func main() {
 	var ctx context.Context
 	mux := http.NewServeMux()
 	minimumReenrollDays, err := strconv.Atoi(cfg.MinimumReenrollDays)
-	estService := estserver.NewEstService(&lamassuCaClient, &verify, devicesDb, minimumReenrollDays, logger)
+	estService := estserver.NewEstService(&lamassuCaClient, &verify, devicesDb, dmsDb, minimumReenrollDays, logger)
 
 	specHandler := func(prefix string) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
@@ -197,4 +221,40 @@ func accessControl(h http.Handler) http.Handler {
 
 		h.ServeHTTP(w, r)
 	})
+}
+func initializeDB(database string, user string, password string, hostname string, port string, migrationsFilePath string, logger log.Logger) store.DB {
+	devicesConnStr := "dbname=" + database + " user=" + user + " password=" + password + " host=" + hostname + " port=" + port + " sslmode=disable"
+	devicesStore, err := db.NewDB("postgres", devicesConnStr, logger)
+	if err != nil {
+		level.Error(logger).Log("err", err, "msg", "Could not start connection with database. Will sleep for 5 seconds and exit the program")
+		time.Sleep(5 * time.Second)
+		os.Exit(1)
+	}
+
+	level.Info(logger).Log("msg", "Connection established with Devices database")
+
+	level.Info(logger).Log("msg", "Checking if DB migration is required")
+
+	devicesDb := devicesStore.(*db.DB)
+	driver, err := migratePostgres.WithInstance(devicesDb.DB, &migratePostgres.Config{})
+	if err != nil {
+		level.Error(logger).Log("err", err, "msg", "Could not create postgres migration driver")
+		os.Exit(1)
+	}
+
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://"+migrationsFilePath,
+		"postgres", driver)
+	if err != nil {
+		level.Error(logger).Log("err", err, "msg", "Could not create db migration instance ")
+		os.Exit(1)
+	}
+	err = m.Force(4)
+	//err = m.Up()
+	if err != nil {
+		level.Error(logger).Log("err", err, "msg", "Could not perform db migration")
+		os.Exit(1)
+	}
+
+	return devicesStore
 }

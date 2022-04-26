@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 	deviceModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 
 	"github.com/go-kit/kit/metrics"
@@ -36,24 +37,24 @@ func (mw *instrumentingMiddleware) Health(ctx context.Context) bool {
 	return mw.next.Health(ctx)
 }
 
-func (mw *instrumentingMiddleware) PostDevice(ctx context.Context, alias string, deviceID string, DmsID int, KeyMetadata deviceModel.PrivateKeyMetadata, Subject deviceModel.Subject) (deviceResp deviceModel.Device, err error) {
+func (mw *instrumentingMiddleware) PostDevice(ctx context.Context, alias string, deviceID string, DmsID string, description string, tags []string, iconName string, iconColor string) (deviceResp deviceModel.Device, err error) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "PostDevice", "error", fmt.Sprint(err != nil)}
 		mw.requestCount.With(lvs...).Add(1)
 		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
 	}(time.Now())
 
-	return mw.next.PostDevice(ctx, alias, deviceID, DmsID, KeyMetadata, Subject)
+	return mw.next.PostDevice(ctx, alias, deviceID, DmsID, description, tags, iconName, iconColor)
 }
 
-func (mw *instrumentingMiddleware) GetDevices(ctx context.Context) (device []deviceModel.Device, err error) {
+func (mw *instrumentingMiddleware) GetDevices(ctx context.Context, queryParameters device.QueryParameters) (device []deviceModel.Device, length int, err error) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "GetDevices", "error", fmt.Sprint(err != nil)}
 		mw.requestCount.With(lvs...).Add(1)
 		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
 	}(time.Now())
 
-	return mw.next.GetDevices(ctx)
+	return mw.next.GetDevices(ctx, queryParameters)
 }
 
 func (mw *instrumentingMiddleware) GetDeviceById(ctx context.Context, deviceId string) (device deviceModel.Device, err error) {
@@ -65,15 +66,24 @@ func (mw *instrumentingMiddleware) GetDeviceById(ctx context.Context, deviceId s
 
 	return mw.next.GetDeviceById(ctx, deviceId)
 }
+func (mw *instrumentingMiddleware) UpdateDeviceById(ctx context.Context, alias string, deviceID string, DmsID string, description string, tags []string, iconName string, iconColor string) (deviceResp deviceModel.Device, err error) {
+	defer func(begin time.Time) {
+		lvs := []string{"method", "UpdateDeviceById", "error", fmt.Sprint(err != nil)}
+		mw.requestCount.With(lvs...).Add(1)
+		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
+	}(time.Now())
 
-func (mw *instrumentingMiddleware) GetDevicesByDMS(ctx context.Context, dmsId string) (devices []deviceModel.Device, err error) {
+	return mw.next.UpdateDeviceById(ctx, alias, deviceID, DmsID, description, tags, iconName, iconColor)
+}
+
+func (mw *instrumentingMiddleware) GetDevicesByDMS(ctx context.Context, dmsId string, queryParameters device.QueryParameters) (devices []deviceModel.Device, err error) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "GetDevicesByDMS", "error", fmt.Sprint(err != nil)}
 		mw.requestCount.With(lvs...).Add(1)
 		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
 	}(time.Now())
 
-	return mw.next.GetDevicesByDMS(ctx, dmsId)
+	return mw.next.GetDevicesByDMS(ctx, dmsId, queryParameters)
 }
 func (mw *instrumentingMiddleware) DeleteDevice(ctx context.Context, id string) (err error) {
 	defer func(begin time.Time) {
@@ -120,21 +130,21 @@ func (mw *instrumentingMiddleware) GetDeviceCertHistory(ctx context.Context, id 
 
 	return mw.next.GetDeviceCertHistory(ctx, id)
 }
-func (mw *instrumentingMiddleware) GetDmsCertHistoryThirtyDays(ctx context.Context) (history []deviceModel.DMSCertHistory, err error) {
+func (mw *instrumentingMiddleware) GetDmsCertHistoryThirtyDays(ctx context.Context, queryParameters device.QueryParameters) (history []deviceModel.DMSCertHistory, err error) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "GetDmsCertHistoryThirtyDays", "error", fmt.Sprint(err != nil)}
 		mw.requestCount.With(lvs...).Add(1)
 		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
 	}(time.Now())
 
-	return mw.next.GetDmsCertHistoryThirtyDays(ctx)
+	return mw.next.GetDmsCertHistoryThirtyDays(ctx, queryParameters)
 }
-func (mw *instrumentingMiddleware) GetDmsLastIssuedCert(ctx context.Context) (dmsLastIssued []deviceModel.DMSLastIssued, err error) {
+func (mw *instrumentingMiddleware) GetDmsLastIssuedCert(ctx context.Context, queryParameters device.QueryParameters) (dmsLastIssued []deviceModel.DMSLastIssued, err error) {
 	defer func(begin time.Time) {
 		lvs := []string{"method", "GetDmsLastIssuedCert", "error", fmt.Sprint(err != nil)}
 		mw.requestCount.With(lvs...).Add(1)
 		mw.requestLatency.With(lvs...).Observe(time.Since(begin).Seconds())
 	}(time.Now())
 
-	return mw.next.GetDmsLastIssuedCert(ctx)
+	return mw.next.GetDmsLastIssuedCert(ctx, queryParameters)
 }

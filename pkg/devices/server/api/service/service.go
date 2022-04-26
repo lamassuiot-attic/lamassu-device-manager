@@ -8,10 +8,12 @@ import (
 	"encoding/asn1"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	lamassucaclient "github.com/lamassuiot/lamassu-ca/pkg/client"
+
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 	devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device/store"
@@ -19,18 +21,19 @@ import (
 
 type Service interface {
 	Health(ctx context.Context) bool
-	PostDevice(ctx context.Context, alias string, deviceID string, dmsID int, privateKeyMetadata device.PrivateKeyMetadata, subject device.Subject) (devicesModel.Device, error)
-	GetDevices(ctx context.Context) ([]devicesModel.Device, error)
+	PostDevice(ctx context.Context, alias string, deviceID string, dmsID string, description string, tags []string, iconName string, iconColor string) (devicesModel.Device, error)
+	UpdateDeviceById(ctx context.Context, alias string, deviceID string, dmsID string, description string, tags []string, iconName string, iconColor string) (devicesModel.Device, error)
+	GetDevices(ctx context.Context, queryParameters device.QueryParameters) ([]devicesModel.Device, int, error)
 	GetDeviceById(ctx context.Context, deviceId string) (devicesModel.Device, error)
-	GetDevicesByDMS(ctx context.Context, dmsId string) ([]devicesModel.Device, error)
+	GetDevicesByDMS(ctx context.Context, dmsId string, queryParameters device.QueryParameters) ([]devicesModel.Device, error)
 	DeleteDevice(ctx context.Context, id string) error
 	RevokeDeviceCert(ctx context.Context, id string, revocationReason string) error
 
 	GetDeviceLogs(ctx context.Context, id string) ([]devicesModel.DeviceLog, error)
-	GetDeviceCert(ctx context.Context, id string) (devicesModel.DeviceCert, error)
+	GetDeviceCert(ctx context.Context, id string) (device.DeviceCert, error)
 	GetDeviceCertHistory(ctx context.Context, id string) ([]devicesModel.DeviceCertHistory, error)
-	GetDmsCertHistoryThirtyDays(ctx context.Context) ([]devicesModel.DMSCertHistory, error)
-	GetDmsLastIssuedCert(ctx context.Context) ([]devicesModel.DMSLastIssued, error)
+	GetDmsCertHistoryThirtyDays(ctx context.Context, queryParameters device.QueryParameters) ([]devicesModel.DMSCertHistory, error)
+	GetDmsLastIssuedCert(ctx context.Context, queryParameters device.QueryParameters) ([]devicesModel.DMSLastIssued, error)
 
 	//getKeyStrength(keyType string, keyBits int) string
 	//_generateCSR(ctx context.Context, keyType string, priv interface{}, commonName string, country string, state string, locality string, org string, orgUnit string) ([]byte, error)
@@ -56,14 +59,8 @@ func (s *devicesService) Health(ctx context.Context) bool {
 	return true
 }
 
-func (s *devicesService) PostDevice(ctx context.Context, alias string, deviceID string, dmsID int, privateKeyMetadata device.PrivateKeyMetadata, subject device.Subject) (devicesModel.Device, error) {
-	var PrivateKeyMetadataWithStregth device.PrivateKeyMetadataWithStregth
-
-	PrivateKeyMetadataWithStregth.KeyBits = privateKeyMetadata.KeyBits
-	PrivateKeyMetadataWithStregth.KeyType = privateKeyMetadata.KeyType
-	PrivateKeyMetadataWithStregth.KeyStrength = getKeyStrength(privateKeyMetadata.KeyType, privateKeyMetadata.KeyBits)
-
-	err := s.devicesDb.InsertDevice(ctx, alias, deviceID, dmsID, PrivateKeyMetadataWithStregth, subject)
+func (s *devicesService) PostDevice(ctx context.Context, alias string, deviceID string, dmsID string, description string, tags []string, iconName string, iconColor string) (devicesModel.Device, error) {
+	err := s.devicesDb.InsertDevice(ctx, alias, deviceID, dmsID, description, tags, iconName, iconColor)
 	if err != nil {
 		return devicesModel.Device{}, err
 	}
@@ -94,27 +91,92 @@ func (s *devicesService) PostDevice(ctx context.Context, alias string, deviceID 
 	return device, err
 }
 
-func (s *devicesService) GetDevices(ctx context.Context) ([]devicesModel.Device, error) {
-	devices, err := s.devicesDb.SelectAllDevices(ctx)
+func (s *devicesService) UpdateDeviceById(ctx context.Context, alias string, deviceID string, dmsID string, description string, tags []string, iconName string, iconColor string) (devicesModel.Device, error) {
+	err := s.devicesDb.UpdateByID(ctx, alias, deviceID, dmsID, description, tags, iconName, iconColor)
 	if err != nil {
-		return []devicesModel.Device{}, err
+		return devicesModel.Device{}, err
 	}
 
-	return devices, nil
+	device, err := s.devicesDb.SelectDeviceById(ctx, deviceID)
+	if err != nil {
+		return devicesModel.Device{}, err
+	}
+	return device, err
 }
 
-func (s *devicesService) GetDevicesByDMS(ctx context.Context, dmsId string) ([]devicesModel.Device, error) {
+func (s *devicesService) GetDevices(ctx context.Context, queryParameters device.QueryParameters) ([]devicesModel.Device, int, error) {
+	devices, length, err := s.devicesDb.SelectAllDevices(ctx, queryParameters)
+	if err != nil {
+		return []devicesModel.Device{}, 0, err
+	}
+	var dev []devicesModel.Device
+	for _, d := range devices {
+		if d.CurrentCertificate.SerialNumber != "" {
+			currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, d.CurrentCertificate.SerialNumber)
+			if err != nil {
+				return []devicesModel.Device{}, 0, err
+			}
+
+			cert, err := s.lamassuCaClient.GetCert(ctx, currentCertHistory.IsuuerName, currentCertHistory.SerialNumber, "pki")
+
+			if err != nil {
+				return []devicesModel.Device{}, 0, err
+			}
+			d.CurrentCertificate.Valid_to = cert.ValidTo
+			d.CurrentCertificate.Cert = cert.CertContent.CerificateBase64
+			dev = append(dev, d)
+		} else {
+			dev = append(dev, d)
+		}
+
+	}
+
+	return dev, length, nil
+}
+
+func (s *devicesService) GetDevicesByDMS(ctx context.Context, dmsId string, queryParameters device.QueryParameters) ([]devicesModel.Device, error) {
 	devices, err := s.devicesDb.SelectAllDevicesByDmsId(ctx, dmsId)
 	if err != nil {
 		return []devicesModel.Device{}, err
 	}
 
-	return devices, nil
+	var dev []devicesModel.Device
+	for _, d := range devices {
+		if d.CurrentCertificate.SerialNumber != "" {
+			currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, d.CurrentCertificate.SerialNumber)
+			if err != nil {
+				return []devicesModel.Device{}, err
+			}
+
+			cert, err := s.lamassuCaClient.GetCert(ctx, currentCertHistory.IsuuerName, currentCertHistory.SerialNumber, "pki")
+
+			if err != nil {
+				return []devicesModel.Device{}, err
+			}
+			d.CurrentCertificate.Valid_to = cert.ValidTo
+			d.CurrentCertificate.Cert = cert.CertContent.CerificateBase64
+			dev = append(dev, d)
+		}
+		dev = append(dev, d)
+
+	}
+
+	return dev, nil
 }
 func (s *devicesService) GetDeviceById(ctx context.Context, deviceId string) (devicesModel.Device, error) {
 	device, err := s.devicesDb.SelectDeviceById(ctx, deviceId)
 	if err != nil {
 		return devicesModel.Device{}, err
+	}
+	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, device.CurrentCertificate.SerialNumber)
+	if err == nil {
+		cert, err := s.lamassuCaClient.GetCert(ctx, currentCertHistory.IsuuerName, currentCertHistory.SerialNumber, "pki")
+
+		if err != nil {
+			return devicesModel.Device{}, err
+		}
+		device.CurrentCertificate.Valid_to = cert.ValidTo
+		device.CurrentCertificate.Cert = cert.CertContent.CerificateBase64
 	}
 
 	return device, nil
@@ -148,7 +210,7 @@ func (s *devicesService) DeleteDevice(ctx context.Context, id string) error {
 
 func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revocationReason string) error {
 	dev, err := s.devicesDb.SelectDeviceById(ctx, id)
-	if dev.CurrentCertSerialNumber == "" {
+	if dev.CurrentCertificate.SerialNumber == "" {
 		return err
 	}
 
@@ -156,7 +218,8 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revoca
 		return err
 	}
 
-	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, dev.CurrentCertSerialNumber)
+	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, dev.CurrentCertificate.SerialNumber)
+
 	if err != nil {
 		return err
 	}
@@ -168,10 +231,10 @@ func (s *devicesService) RevokeDeviceCert(ctx context.Context, id string, revoca
 		return err
 	}
 
-	err = s.devicesDb.UpdateDeviceCertHistory(ctx, id, dev.CurrentCertSerialNumber, devicesModel.CertHistoryRevoked)
+	/*err = s.devicesDb.UpdateDeviceCertHistory(ctx, id, dev.CurrentCertificate.SerialNumber, devicesModel.CertHistoryRevoked)
 	if err != nil {
 		return err
-	}
+	}*/
 
 	err = s.devicesDb.UpdateDeviceStatusByID(ctx, id, devicesModel.DeviceCertRevoked)
 	if err != nil {
@@ -205,15 +268,40 @@ func (s *devicesService) GetDeviceLogs(ctx context.Context, id string) ([]device
 
 func (s *devicesService) GetDeviceCertHistory(ctx context.Context, id string) ([]devicesModel.DeviceCertHistory, error) {
 	history, err := s.devicesDb.SelectDeviceCertHistory(ctx, id)
+	var certHistory []devicesModel.DeviceCertHistory
+	for _, element := range history {
+		dev, err := s.devicesDb.SelectDeviceById(ctx, id)
+		if err != nil {
+			return []devicesModel.DeviceCertHistory{}, err
+		}
+		cert, err := s.lamassuCaClient.GetCert(ctx, element.IsuuerName, element.SerialNumber, "pki")
+		if err != nil {
+			return []devicesModel.DeviceCertHistory{}, err
+		}
+		t := time.Unix(cert.RevocationTimestamp, 0)
+		element.RevocationTimestamp = t.Format("2006-02-01 15:04:05")
+		if err != nil {
+			return []devicesModel.DeviceCertHistory{}, err
+		} else {
+
+			if dev.CreationTimestamp == dev.ModificationTimestamp {
+				element.Status = device.DevicePendingProvision
+			} else {
+				element.Status = cert.Status
+			}
+		}
+		certHistory = append(certHistory, element)
+
+	}
 	if err != nil {
 		return []devicesModel.DeviceCertHistory{}, err
 	}
-	return history, nil
+	return certHistory, nil
 }
 
 func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesModel.DeviceCert, error) {
 	dev, err := s.devicesDb.SelectDeviceById(ctx, id)
-	if dev.CurrentCertSerialNumber == "" {
+	if dev.CurrentCertificate.SerialNumber == "" {
 		return devicesModel.DeviceCert{}, errors.New("The device has no certificate")
 	}
 
@@ -221,7 +309,8 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 		return devicesModel.DeviceCert{}, err
 	}
 
-	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, dev.CurrentCertSerialNumber)
+	currentCertHistory, err := s.devicesDb.SelectDeviceCertHistoryBySerialNumber(ctx, dev.CurrentCertificate.SerialNumber)
+
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
 	}
@@ -230,6 +319,12 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 
 	if err != nil {
 		return devicesModel.DeviceCert{}, err
+	}
+
+	if dev.CreationTimestamp == dev.ModificationTimestamp {
+		currentCertHistory.Status = device.DevicePendingProvision
+	} else {
+		currentCertHistory.Status = cert.Status
 	}
 
 	return devicesModel.DeviceCert{
@@ -244,26 +339,27 @@ func (s *devicesService) GetDeviceCert(ctx context.Context, id string) (devicesM
 	}, nil
 }
 
-func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context) ([]devicesModel.DMSCertHistory, error) {
-	devices, err := s.devicesDb.SelectAllDevices(ctx)
+func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context, queryParameters device.QueryParameters) ([]devicesModel.DMSCertHistory, error) {
+	devices, _, err := s.devicesDb.SelectAllDevices(ctx, queryParameters)
 	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not get devices from DB")
+		level.Debug(s.logger).Log("err", err, "msg", "Could not get devices from DB")
 		return []devicesModel.DMSCertHistory{}, err
 	}
 
-	deviceDmsMap := make(map[string]int)
+	deviceDmsMap := make(map[string]string)
 	for i := 0; i < len(devices); i++ {
 		dev := devices[i]
 		deviceDmsMap[dev.Id] = dev.DmsId
 	}
 
-	certHistory, err := s.devicesDb.SelectDeviceCertHistoryLastThirtyDays(ctx)
+	certHistory, err := s.devicesDb.SelectDeviceCertHistoryLastThirtyDays(ctx, queryParameters)
+
 	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not get last 30 days issued certs from DB")
+		level.Debug(s.logger).Log("err", err, "msg", "Could not get last 30 days issued certs from DB")
 		return []devicesModel.DMSCertHistory{}, err
 	}
 
-	dmsCertsMap := make(map[int]int) //dmsId -> length
+	dmsCertsMap := make(map[string]int) //dmsId -> length
 
 	for i := 0; i < len(certHistory); i++ {
 		certHistory := certHistory[i]
@@ -286,41 +382,18 @@ func (s *devicesService) GetDmsCertHistoryThirtyDays(ctx context.Context) ([]dev
 	return dmsCerts, nil
 }
 
-func (s *devicesService) GetDmsLastIssuedCert(ctx context.Context) ([]devicesModel.DMSLastIssued, error) {
-	lastIssued, err := s.devicesDb.SelectDmssLastIssuedCert(ctx)
+func (s *devicesService) GetDmsLastIssuedCert(ctx context.Context, queryParameters device.QueryParameters) ([]devicesModel.DMSLastIssued, error) {
+	lastIssued, err := s.devicesDb.SelectDmssLastIssuedCert(ctx, queryParameters)
 	if err != nil {
-		level.Error(s.logger).Log("err", err, "msg", "Could not get devices from DB")
+		level.Debug(s.logger).Log("err", err, "msg", "Could not get devices from DB")
 		return []devicesModel.DMSLastIssued{}, err
 	}
 	return lastIssued, nil
 }
 
-func getKeyStrength(keyType string, keyBits int) string {
-	var keyStrength string = "unknown"
-	switch keyType {
-	case "rsa":
-		if keyBits < 2048 {
-			keyStrength = "low"
-		} else if keyBits >= 2048 && keyBits < 3072 {
-			keyStrength = "medium"
-		} else {
-			keyStrength = "high"
-		}
-	case "ec":
-		if keyBits < 224 {
-			keyStrength = "low"
-		} else if keyBits >= 224 && keyBits < 256 {
-			keyStrength = "medium"
-		} else {
-			keyStrength = "high"
-		}
-	}
-	return keyStrength
-}
-
 func _generateCSR(ctx context.Context, keyType string, priv interface{}, commonName string, country string, state string, locality string, org string, orgUnit string) ([]byte, error) {
 	var signingAlgorithm x509.SignatureAlgorithm
-	if keyType == "ecdsa" {
+	if keyType == "EC" {
 		signingAlgorithm = x509.ECDSAWithSHA256
 	} else {
 		signingAlgorithm = x509.SHA256WithRSA
@@ -347,4 +420,26 @@ func _generateCSR(ctx context.Context, keyType string, priv interface{}, commonN
 	}
 	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, &template, priv)
 	return csrBytes, err
+}
+func getKeyStrength(keyType string, keyBits int) string {
+	var keyStrength string = "unknown"
+	switch keyType {
+	case "RSA":
+		if keyBits < 2048 {
+			keyStrength = "low"
+		} else if keyBits >= 2048 && keyBits < 3072 {
+			keyStrength = "medium"
+		} else {
+			keyStrength = "high"
+		}
+	case "EC":
+		if keyBits < 224 {
+			keyStrength = "low"
+		} else if keyBits >= 224 && keyBits < 256 {
+			keyStrength = "medium"
+		} else {
+			keyStrength = "high"
+		}
+	}
+	return keyStrength
 }

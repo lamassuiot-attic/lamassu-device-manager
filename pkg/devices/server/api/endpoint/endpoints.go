@@ -2,15 +2,11 @@ package endpoint
 
 import (
 	"context"
-	"math"
-
-	"github.com/go-playground/validator/v10"
-	devmanagererrors "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/errors"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/service"
-	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 
 	"github.com/go-kit/kit/endpoint"
 	"github.com/go-kit/kit/tracing/opentracing"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/service"
+	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 	stdopentracing "github.com/opentracing/opentracing-go"
 )
 
@@ -19,6 +15,7 @@ type Endpoints struct {
 	PostDeviceEndpoint          endpoint.Endpoint
 	GetDevices                  endpoint.Endpoint
 	GetDeviceById               endpoint.Endpoint
+	UpdateDeviceById            endpoint.Endpoint
 	GetDevicesByDMS             endpoint.Endpoint
 	DeleteDevice                endpoint.Endpoint
 	DeleteRevoke                endpoint.Endpoint
@@ -49,6 +46,11 @@ func MakeServerEndpoints(s service.Service, otTracer stdopentracing.Tracer) Endp
 	{
 		getDevicesByIdEndpoint = MakeGetDeviceByIdEndpoint(s)
 		getDevicesByIdEndpoint = opentracing.TraceServer(otTracer, "GetDeviceById")(getDevicesByIdEndpoint)
+	}
+	var updateDevicesByIdEndpoint endpoint.Endpoint
+	{
+		updateDevicesByIdEndpoint = MakeUpdateDeviceByIdEndpoint(s)
+		updateDevicesByIdEndpoint = opentracing.TraceServer(otTracer, "UpdateDeviceById")(updateDevicesByIdEndpoint)
 	}
 	var getDevicesByDMSEndpoint endpoint.Endpoint
 	{
@@ -96,6 +98,7 @@ func MakeServerEndpoints(s service.Service, otTracer stdopentracing.Tracer) Endp
 		PostDeviceEndpoint:          postDeviceEndpoint,
 		GetDevices:                  getDevicesEndpoint,
 		GetDeviceById:               getDevicesByIdEndpoint,
+		UpdateDeviceById:            updateDevicesByIdEndpoint,
 		GetDevicesByDMS:             getDevicesByDMSEndpoint,
 		DeleteDevice:                deleteDeviceEndpoint,
 		DeleteRevoke:                deleteRevokeEndpoint,
@@ -117,24 +120,26 @@ func MakeHealthEndpoint(s service.Service) endpoint.Endpoint {
 func MakePostDeviceEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(CreateDeviceRequest)
-		err = ValidateCreatrCARequest(req)
+		/*err = ValidateCreatrCARequest(req)
 		if err != nil {
 			valError := devmanagererrors.ValidationError{
 				Msg: err.Error(),
 			}
 			return nil, &valError
-		}
-		device, e := s.PostDevice(ctx, req.Alias, req.DeviceID, req.DmsId, device.PrivateKeyMetadata(req.KeyMetadata), device.Subject(req.Subject))
+		}*/
+		device, e := s.PostDevice(ctx, req.Alias, req.DeviceID, req.DmsId, req.Description, req.Tags, req.IconName, req.IconColor)
 		return device, e
 	}
 }
 
 func MakeGetDevicesEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		devices, e := s.GetDevices(ctx)
-		return devices, e
+		req := request.(device.QueryParameters)
+		devices, length, e := s.GetDevices(ctx, req)
+		return GetDevicesResponse{TotalDevices: length, Devices: devices}, e
 	}
 }
+
 func MakeGetDeviceByIdEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(GetDevicesByIdRequest)
@@ -142,11 +147,21 @@ func MakeGetDeviceByIdEndpoint(s service.Service) endpoint.Endpoint {
 		return device, e
 	}
 }
+
+func MakeUpdateDeviceByIdEndpoint(s service.Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(UpdateDevicesByIdRequest)
+		device, e := s.UpdateDeviceById(ctx, req.Alias, req.DeviceID, req.DmsId, req.Description, req.Tags, req.IconName, req.IconColor)
+		return device, e
+	}
+}
+
 func MakeGetDevicesByDMSEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		req := request.(GetDevicesByDMSRequest)
-		devices, e := s.GetDevicesByDMS(ctx, req.Id)
-		return devices, e
+		reqId := request.(GetDevicesByDMSRequest)
+		req := request.(device.QueryParameters)
+		devices, e := s.GetDevicesByDMS(ctx, reqId.Id, req)
+		return GetDevicesResponse{TotalDevices: len(devices), Devices: devices}, e
 	}
 }
 func MakeDeleteDeviceEndpoint(s service.Service) endpoint.Endpoint {
@@ -167,13 +182,15 @@ func MakeDeleteRevokeEndpoint(s service.Service) endpoint.Endpoint {
 		return nil, e
 	}
 }
+
 func MakeGetDeviceLogsEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		req := request.(GetDeviceLogsRequest)
-		logs, e := s.GetDeviceLogs(ctx, req.Id)
+		reqL := request.(GetDeviceLogsRequest)
+		logs, e := s.GetDeviceLogs(ctx, reqL.Id)
 		return logs, e
 	}
 }
+
 func MakeGetDeviceCertEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
 		req := request.(GetDeviceCertRequest)
@@ -183,20 +200,22 @@ func MakeGetDeviceCertEndpoint(s service.Service) endpoint.Endpoint {
 }
 func MakeGetDeviceCertHistoryEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		req := request.(GetDeviceCertHistoryRequest)
-		history, e := s.GetDeviceCertHistory(ctx, req.Id)
+		reqCHR := request.(GetDeviceCertHistoryRequest)
+		history, e := s.GetDeviceCertHistory(ctx, reqCHR.Id)
 		return history, e
 	}
 }
 func MakeGetDmsCertHistoryThirtyDaysEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		history, e := s.GetDmsCertHistoryThirtyDays(ctx)
+		var req device.QueryParameters
+		history, e := s.GetDmsCertHistoryThirtyDays(ctx, req)
 		return history, e
 	}
 }
 func MakeGetDmsLastIssueCertEndpoint(s service.Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
-		history, e := s.GetDmsLastIssuedCert(ctx)
+		req := request.(device.QueryParameters)
+		history, e := s.GetDmsLastIssuedCert(ctx, req)
 		return history, e
 	}
 }
@@ -209,10 +228,14 @@ type HealthResponse struct {
 }
 
 type CreateDeviceRequest struct {
-	DeviceID string `json:"id" validate:"required"`
-	Alias    string `json:"alias"`
-	DmsId    int    `json:"dms_id" validate:"required"`
-	Subject  struct {
+	DeviceID    string   `json:"id" validate:"required"`
+	Alias       string   `json:"alias"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	IconName    string   `json:"icon_name"`
+	IconColor   string   `json:"icon_color"`
+	DmsId       string   `json:"dms_id" validate:"required"`
+	/*Subject     struct {
 		CN string `json:"common_name" validate:"required"`
 		O  string `json:"organization"`
 		OU string `json:"organization_unit"`
@@ -223,10 +246,10 @@ type CreateDeviceRequest struct {
 	KeyMetadata struct {
 		KeyType string `json:"type" validate:"oneof='rsa' 'ec'"`
 		KeyBits int    `json:"bits" validate:"required"`
-	} `json:"key_metadata" validate:"required"`
+	} `json:"key_metadata" validate:"required"`*/
 }
 
-func ValidateCreatrCARequest(request CreateDeviceRequest) error {
+/*func ValidateCreatrCARequest(request CreateDeviceRequest) error {
 	CreateCARequestStructLevelValidation := func(sl validator.StructLevel) {
 		req := sl.Current().Interface().(CreateDeviceRequest)
 		switch req.KeyMetadata.KeyType {
@@ -235,7 +258,7 @@ func ValidateCreatrCARequest(request CreateDeviceRequest) error {
 				sl.ReportError(req.KeyMetadata.KeyBits, "bits", "Bits", "bits1024multipleAndGt2048", "")
 			}
 		case "ec":
-			if req.KeyMetadata.KeyBits != 224 || req.KeyMetadata.KeyBits != 256 || req.KeyMetadata.KeyBits != 384 {
+			if req.KeyMetadata.KeyBits != 224 && req.KeyMetadata.KeyBits != 256 && req.KeyMetadata.KeyBits != 384 {
 				sl.ReportError(req.KeyMetadata.KeyBits, "bits", "Bits", "bitsEcdsaMultiple", "")
 			}
 		}
@@ -244,7 +267,7 @@ func ValidateCreatrCARequest(request CreateDeviceRequest) error {
 	validate := validator.New()
 	validate.RegisterStructValidation(CreateCARequestStructLevelValidation, CreateDeviceRequest{})
 	return validate.Struct(request)
-}
+}*/
 
 type PostDeviceResponse struct {
 	Device device.Device `json:"device,omitempty"`
@@ -254,13 +277,24 @@ type PostDeviceResponse struct {
 func (r PostDeviceResponse) error() error { return r.Err }
 
 type GetDevicesResponse struct {
-	Devices []device.Device `json:"devices,omitempty"`
-	Err     error           `json:"err,omitempty"`
+	TotalDevices int             `json:"total_devices"`
+	Devices      []device.Device `json:"devices,omitempty"`
 }
 
 type GetDevicesByIdRequest struct {
 	Id string
 }
+
+type UpdateDevicesByIdRequest struct {
+	DeviceID    string   `json:"id" validate:"required"`
+	Alias       string   `json:"alias"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	IconName    string   `json:"icon_name"`
+	IconColor   string   `json:"icon_color"`
+	DmsId       string   `json:"dms_id" `
+}
+
 type GetDevicesByDMSRequest struct {
 	Id string
 }

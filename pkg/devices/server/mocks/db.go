@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 	devicesModel "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
+	"github.com/lamassuiot/lamassu-dms-enroller/pkg/server/models/dms"
 
 	//devicesStore "github.com/lamassuiot/lamassu-device-manager/pkg/devices/models/device/store"
 
@@ -66,7 +67,17 @@ func checkDBAlive(db *sql.DB) error {
 	return err
 }
 
-func (db *MockDB) InsertDevice(ctx context.Context, alias string, deviceID string, dmsID int, privateKeyMetadata device.PrivateKeyMetadataWithStregth, subject device.Subject) error {
+func (db *MockDB) SelectBySerialNumber(ctx context.Context, SerialNumber string) (string, error) {
+	return "", nil
+}
+func (db *MockDB) SelectByDMSIDAuthorizedCAs(ctx context.Context, dmsid string) ([]dms.AuthorizedCAs, error) {
+	return nil, nil
+}
+func (db *MockDB) UpdateByID(ctx context.Context, alias string, deviceID string, dmsID string, description string, tags []string, iconName string, iconColor string) error {
+	return nil
+}
+
+func (db *MockDB) InsertDevice(ctx context.Context, alias string, deviceID string, dmsID string, description string, tags []string, iconName string, iconColor string) error {
 	if deviceID == "error" {
 		return errors.New("error")
 
@@ -190,18 +201,18 @@ func (db *MockDB) SelectDeviceById(ctx context.Context, id string) (device.Devic
 
 }
 
-func (db *MockDB) SelectAllDevices(ctx context.Context) ([]device.Device, error) {
+func (db *MockDB) SelectAllDevices(ctx context.Context, queryParameters device.QueryParameters) ([]device.Device, int, error) {
 	failDB := ctx.Value("DBShouldFail").(bool)
 
 	if failDB {
 		var a []device.Device
-		return a, errors.New("Testing DB connection failed")
+		return a, 0, errors.New("Testing DB connection failed")
 	} else {
 		var devList []devicesModel.Device
 		var d devicesModel.Device
 		d = testDevice()
 		devList = append(devList, d)
-		return devList, nil
+		return devList, 0, nil
 	}
 
 }
@@ -218,7 +229,8 @@ func (db *MockDB) SelectAllDevicesByDmsId(ctx context.Context, dms_id string) ([
 	}
 	return devList, nil
 }
-func (db *MockDB) UpdateDeviceStatusByID(ctx context.Context, id string, newStatus string) error {
+
+/*func (db *MockDB) UpdateDeviceStatusByID(ctx context.Context, id string, newStatus string) error {
 	if ctx.Value("DBUpdateStatus") != nil {
 		failDBLog := ctx.Value("DBUpdateStatus").(bool)
 
@@ -232,7 +244,7 @@ func (db *MockDB) UpdateDeviceStatusByID(ctx context.Context, id string, newStat
 		return nil
 	}
 	return nil
-}
+}*/
 func (db *MockDB) UpdateDeviceCertificateSerialNumberByID(ctx context.Context, id string, serialNumber string) error {
 	if ctx.Value("DBUpdateDeviceCertificateSerialNumberByID") != nil {
 		failDBLog := ctx.Value("DBUpdateDeviceCertificateSerialNumberByID").(bool)
@@ -275,10 +287,10 @@ func (db *MockDB) InsertLog(ctx context.Context, l device.DeviceLog) error {
 	}
 	return nil
 }
-func (db *MockDB) SelectDeviceLogs(ctx context.Context, id string) ([]device.DeviceLog, error) {
+func (db *MockDB) SelectDeviceLogs(ctx context.Context, deviceId string) ([]device.DeviceLog, error) {
 
 	var d []device.DeviceLog
-	if id == "errorGetDeviceLogs" {
+	if deviceId == "errorGetDeviceLogs" {
 		return testDeviceLogs(), errors.New("err")
 	} else {
 		return d, nil
@@ -314,7 +326,7 @@ func (db *MockDB) SelectDeviceCertHistoryBySerialNumber(ctx context.Context, ser
 		return testGetDeviceCertHistory()[0], nil
 	}
 }
-func (db *MockDB) SelectDeviceCertHistoryLastThirtyDays(ctx context.Context) ([]device.DeviceCertHistory, error) {
+func (db *MockDB) SelectDeviceCertHistoryLastThirtyDays(ctx context.Context, queryParameters device.QueryParameters) ([]device.DeviceCertHistory, error) {
 	failDB := ctx.Value("DBSelectDeviceCertHistory").(bool)
 
 	if failDB {
@@ -325,7 +337,7 @@ func (db *MockDB) SelectDeviceCertHistoryLastThirtyDays(ctx context.Context) ([]
 	}
 }
 
-func (db *MockDB) SelectDmssLastIssuedCert(ctx context.Context) ([]device.DMSLastIssued, error) {
+func (db *MockDB) SelectDmssLastIssuedCert(ctx context.Context, queryParameters device.QueryParameters) ([]device.DMSLastIssued, error) {
 	failDB := ctx.Value("DBSelectDmssLastIssuedCert").(bool)
 
 	if failDB {
@@ -347,19 +359,18 @@ func testDevice() devicesModel.Device {
 		CN: "testDeviceMock",
 	}
 	key := devicesModel.PrivateKeyMetadataWithStregth{
-		KeyType:     "rsa",
+		KeyType:     "RSA",
 		KeyBits:     3072,
 		KeyStrength: "",
 	}
 	device := devicesModel.Device{
-		Id:                      "1",
-		Alias:                   "testDeviceMock",
-		Status:                  "CERT_REVOKED",
-		DmsId:                   1,
-		Subject:                 subject,
-		KeyMetadata:             key,
-		CreationTimestamp:       "2022-01-11T07:02:40.082286Z",
-		CurrentCertSerialNumber: "23-33-5b-19-c8-ed-8b-2a-92-5c-7b-57-fc-47-45-e7-12-03-91-23",
+		Id:                "1",
+		Alias:             "testDeviceMock",
+		Status:            "CERT_REVOKED",
+		DmsId:             "1",
+		Subject:           subject,
+		KeyMetadata:       key,
+		CreationTimestamp: "2022-01-11T07:02:40.082286Z",
 	}
 
 	return device
@@ -374,19 +385,18 @@ func testDeviceNoSerialNumber() devicesModel.Device {
 		CN: "testDeviceMock",
 	}
 	key := devicesModel.PrivateKeyMetadataWithStregth{
-		KeyType:     "rsa",
+		KeyType:     "RSA",
 		KeyBits:     3072,
 		KeyStrength: "",
 	}
 	device := devicesModel.Device{
-		Id:                      "1",
-		Alias:                   "noSN",
-		Status:                  "CERT_REVOKED",
-		DmsId:                   1,
-		Subject:                 subject,
-		KeyMetadata:             key,
-		CreationTimestamp:       "2022-01-11T07:02:40.082286Z",
-		CurrentCertSerialNumber: "",
+		Id:                "1",
+		Alias:             "noSN",
+		Status:            "CERT_REVOKED",
+		DmsId:             "1",
+		Subject:           subject,
+		KeyMetadata:       key,
+		CreationTimestamp: "2022-01-11T07:02:40.082286Z",
 	}
 
 	return device
@@ -409,7 +419,7 @@ func testDeviceLogs() []devicesModel.DeviceLog {
 func testDmsLastIssuedCert() []devicesModel.DMSLastIssued {
 	var certList []devicesModel.DMSLastIssued
 	cert := devicesModel.DMSLastIssued{
-		DmsId:        1,
+		DmsId:        "1",
 		Timestamp:    "",
 		SerialNumber: "",
 	}
@@ -422,12 +432,11 @@ func testGetDeviceCertHistory() []devicesModel.DeviceCertHistory {
 	var certList []devicesModel.DeviceCertHistory
 	cert := devicesModel.DeviceCertHistory{
 
-		DeviceId:           "1",
-		SerialNumber:       "",
-		IssuerSerialNumber: "",
-		IsuuerName:         "",
-		Status:             "",
-		CreationTimestamp:  "",
+		DeviceId:          "1",
+		SerialNumber:      "",
+		IsuuerName:        "",
+		Status:            "",
+		CreationTimestamp: "",
 	}
 	certList = append(certList, cert)
 	return certList

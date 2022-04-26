@@ -4,7 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/endpoint"
 	devmanagererrors "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/errors"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/api/service"
+	device "github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/models/device"
 	"github.com/lamassuiot/lamassu-device-manager/pkg/devices/server/utils"
 	stdopentracing "github.com/opentracing/opentracing-go"
 )
@@ -85,6 +89,17 @@ func MakeHTTPHandler(s service.Service, logger log.Logger, otTracer stdopentraci
 		append(
 			options,
 			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "GetDeviceById", logger)),
+			httptransport.ServerBefore(HTTPToContext(logger)),
+		)...,
+	))
+
+	r.Methods("PUT").Path("/v1/devices/{deviceId}").Handler(httptransport.NewServer(
+		e.UpdateDeviceById,
+		decodeUpdateDeviceById,
+		encodeResponse,
+		append(
+			options,
+			httptransport.ServerBefore(opentracing.HTTPToContext(otTracer, "UpdateDevicesById", logger)),
 			httptransport.ServerBefore(HTTPToContext(logger)),
 		)...,
 	))
@@ -186,8 +201,64 @@ func decodeHealthRequest(ctx context.Context, r *http.Request) (request interfac
 }
 
 func decodeRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
-	var req endpoint.HealthRequest
-	return req, nil
+
+	return filterQuery(r), nil
+}
+
+func filterQuery(r *http.Request) device.QueryParameters {
+	f := ""
+	orderArray := ""
+	pageArray := ""
+	page := ""
+	offset := ""
+	field := ""
+	order := ""
+
+	helper := r.URL.RawQuery
+
+	if len(r.URL.RawQuery) > 0 {
+
+		f, helper = middle(helper, "filter={")
+
+		orderArray, helper = middle(helper, "s={")
+		if orderArray != "" {
+			s := strings.Split(orderArray, ",")
+			order = s[0]
+			field = s[1]
+		}
+
+		pageArray, helper = middle(helper, "page={")
+		if pageArray != "" {
+			s := strings.Split(pageArray, ",")
+			page = s[0]
+			offset = s[1]
+		}
+
+	}
+
+	pageInt, _ := strconv.Atoi(page)
+	offsetInt, _ := strconv.Atoi(offset)
+	pagination := device.PaginationOptions{
+		Page:   pageInt,
+		Offset: offsetInt,
+	}
+	orderOpt := device.OrderOptions{
+		Order: order,
+		Field: field,
+	}
+	query := device.QueryParameters{
+		Order:      orderOpt,
+		Pagination: pagination,
+		Filter:     f,
+	}
+	return query
+}
+
+func removeAmpersand(helper string) string {
+	if strings.HasPrefix(helper, "&") {
+		helper = strings.TrimPrefix(helper, "&")
+	}
+	return helper
 }
 
 func decodePostDeviceRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
@@ -206,6 +277,15 @@ func decodeGetDeviceById(ctx context.Context, r *http.Request) (request interfac
 		return nil, ErrMissingDevID()
 	}
 	return endpoint.GetDevicesByIdRequest{Id: id}, nil
+}
+
+func decodeUpdateDeviceById(ctx context.Context, r *http.Request) (request interface{}, err error) {
+	var updateDeviceRequest endpoint.UpdateDevicesByIdRequest
+	json.NewDecoder(r.Body).Decode((&updateDeviceRequest))
+	if err != nil {
+		return nil, errors.New("cannot decode JSON request")
+	}
+	return updateDeviceRequest, nil
 }
 
 func decodeGetDevicesByDMSRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
@@ -239,6 +319,7 @@ func decodedecodeGetDeviceLogsRequest(ctx context.Context, r *http.Request) (req
 	if !ok {
 		return nil, ErrMissingDevID()
 	}
+
 	return endpoint.GetDeviceLogsRequest{Id: id}, nil
 }
 func decodedecodeGetDeviceCertRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
@@ -258,12 +339,14 @@ func decodedecodeGetDeviceCertHistoryRequest(ctx context.Context, r *http.Reques
 	return endpoint.GetDeviceCertHistoryRequest{Id: id}, nil
 }
 func decodedecodeGetDmsCertHistoryThirtyDaysRequest(ctx context.Context, r *http.Request) (request interface{}, err error) {
-	var req endpoint.HealthRequest
-	return req, nil
+	//var req endpoint.HealthRequest
+	return decodeRequest(ctx, r)
 }
 func decodedecodeGetDmsLastIssueCert(ctx context.Context, r *http.Request) (request interface{}, err error) {
-	var req endpoint.HealthRequest
-	return req, nil
+	//var req endpoint.HealthRequest
+	fmt.Println(r.URL.RawQuery)
+	return decodeRequest(ctx, r)
+
 }
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {
@@ -295,4 +378,33 @@ func codeFrom(err error) int {
 	default:
 		return http.StatusInternalServerError
 	}
+}
+
+func match(s string) string {
+	i := strings.Index(s, "{")
+	if i >= 0 {
+		j := strings.Index(s, "}")
+		if j >= 0 {
+			return s[i+1 : j]
+		}
+	}
+	return ""
+}
+
+func middle(in string, field string) (string, string) {
+	result := ""
+	helper := in
+	if strings.Contains(in, field) {
+		helper = removeAmpersand(helper)
+		indexToCutFrom := strings.Index(helper, field)
+		helper = helper[indexToCutFrom:]
+		helper = strings.TrimPrefix(helper, field)
+		if len(helper) > 0 {
+			result = helper[:strings.IndexByte(helper, '}')]
+			helper = strings.Replace(removeAmpersand(in), field+result+"}", "", -1)
+			//helper = strings.TrimPrefix(in, field+helper+"}")
+		}
+	}
+	return result, helper
+
 }

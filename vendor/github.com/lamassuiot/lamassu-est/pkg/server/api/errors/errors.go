@@ -20,3 +20,12 @@ type GenericError struct {
 func (e *GenericError) Error() string {
 	return fmt.Sprintf("%s", e.Message)
 }
+
+type UnAuthorized struct {
+	ResourceType string
+	ResourceId   string
+}
+
+func (e *UnAuthorized) Error() string {
+	return fmt.Sprintf("Unauthorized CA Name. resource_type=%s resource_id=%s", e.ResourceType, e.ResourceId)
+}

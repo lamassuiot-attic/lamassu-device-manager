@@ -393,6 +393,8 @@ func codeFrom(err error) int {
 	switch e := err.(type) {
 	case *esterror.ValidationError:
 		return http.StatusBadRequest
+	case *esterror.UnAuthorized:
+		return http.StatusUnauthorized
 	case *esterror.GenericError:
 		return e.StatusCode
 	default:
