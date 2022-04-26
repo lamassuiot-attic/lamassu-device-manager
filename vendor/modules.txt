@@ -153,15 +153,15 @@ github.com/json-iterator/go
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
-# github.com/lamassuiot/lamassu-ca v1.0.15 => /home/ikerlan/lamassu/lamassu-ca/
+# github.com/lamassuiot/lamassu-ca v1.0.20
 ## explicit
 github.com/lamassuiot/lamassu-ca/pkg/client
 github.com/lamassuiot/lamassu-ca/pkg/server/secrets
 github.com/lamassuiot/lamassu-ca/pkg/server/utils
-# github.com/lamassuiot/lamassu-dms-enroller v0.0.21 => /home/ikerlan/lamassu/lamassu-enroller
+# github.com/lamassuiot/lamassu-dms-enroller v0.0.24
 ## explicit
 github.com/lamassuiot/lamassu-dms-enroller/pkg/server/models/dms
-# github.com/lamassuiot/lamassu-est v0.2.4 => /home/ikerlan/lamassu/lamassu-est/
+# github.com/lamassuiot/lamassu-est v0.2.7
 ## explicit
 github.com/lamassuiot/lamassu-est/pkg/server/api/endpoint
 github.com/lamassuiot/lamassu-est/pkg/server/api/errors
@@ -316,6 +316,3 @@ google.golang.org/protobuf/types/known/durationpb
 google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/yaml.v2 v2.4.0
 gopkg.in/yaml.v2
-# github.com/lamassuiot/lamassu-ca => /home/ikerlan/lamassu/lamassu-ca/
-# github.com/lamassuiot/lamassu-est => /home/ikerlan/lamassu/lamassu-est/
-# github.com/lamassuiot/lamassu-dms-enroller => /home/ikerlan/lamassu/lamassu-enroller
