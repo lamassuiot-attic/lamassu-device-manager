@@ -249,8 +249,8 @@ func initializeDB(database string, user string, password string, hostname string
 		level.Error(logger).Log("err", err, "msg", "Could not create db migration instance ")
 		os.Exit(1)
 	}
-	err = m.Force(4)
-	//err = m.Up()
+
+	m.Up()
 	if err != nil {
 		level.Error(logger).Log("err", err, "msg", "Could not perform db migration")
 		os.Exit(1)

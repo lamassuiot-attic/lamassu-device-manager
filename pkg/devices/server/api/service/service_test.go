@@ -25,6 +25,81 @@ type serviceSetUp struct {
 	lamassuCaClient lamassucaclient.LamassuCaClient
 }
 
+func TestPostDevice(t *testing.T) {
+	srv, ctx := setup(t)
+
+	device := testDevice()
+	deviceError := testDevice()
+	deviceError.Id = "error"
+	deviceErrorLog := device
+	deviceErrorLog.Id = "errorLog"
+	deviceErrorDeviceByID := device
+	deviceErrorDeviceByID.Id = "errorDeviceById"
+
+	testCases := []struct {
+		name string
+		in   devicesModel.Device
+		err  error
+	}{
+		{"Correct device", device, nil},
+		{"Error Inserting Log", deviceErrorLog, errors.New("Could not insert log")},
+		{"Error Inserting Device", deviceError, errors.New("error")},
+		{"Error Finding Device", deviceErrorDeviceByID, errors.New("Could not find device by Id")},
+	}
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("Testing %s", tc.name), func(t *testing.T) {
+
+			if tc.name == "Error Inserting Log" {
+				ctx = context.WithValue(ctx, "DBInsertLog", true)
+			} else {
+				ctx = context.WithValue(ctx, "DBInsertLog", false)
+			}
+			tags := []string{"tag1", "tag2"}
+
+			out, err := srv.PostDevice(ctx, tc.in.Alias, tc.in.Id, tc.in.DmsId, "", tags, "", "")
+			if err != nil {
+				if err.Error() != tc.err.Error() {
+					t.Errorf("Got result is %s; want %s", err, tc.err)
+				}
+			} else {
+				if tc.in.Id != out.Id {
+					t.Errorf("Not receiving expected response")
+				}
+			}
+		})
+	}
+}
+func TestGetDevices(t *testing.T) {
+	srv, ctx := setup(t)
+
+	testCases := []struct {
+		name string
+		ret  error
+	}{
+		{"Correct", nil},
+		{"Error getting devices", errors.New("Testing DB connection failed")},
+	}
+
+	for _, tc := range testCases {
+
+		t.Run(fmt.Sprintf("Testing %s", tc.name), func(t *testing.T) {
+
+			if tc.name == "Error getting devices" {
+				ctx = context.WithValue(ctx, "DBShouldFail", true)
+			} else {
+				ctx = context.WithValue(ctx, "DBShouldFail", false)
+			}
+			_, _, err := srv.GetDevices(ctx, devicesModel.QueryParameters{})
+			if err != nil {
+				if tc.ret.Error() != err.Error() {
+					t.Errorf("Got result is %s; want %s", err, tc.ret)
+				}
+
+			}
+		})
+	}
+}
+
 func TestHealth(t *testing.T) {
 	srv, ctx := setup(t)
 	type testCasesHealth struct {
@@ -93,7 +168,7 @@ func TestGetDeviceCert(t *testing.T) {
 	}
 }
 
-func TestGetKeyStrength(t *testing.T) {
+/*func TestGetKeyStrength(t *testing.T) {
 	//srv, _ := setup(t)
 	type testCases struct {
 		keyType string
@@ -110,13 +185,13 @@ func TestGetKeyStrength(t *testing.T) {
 	}
 	for _, tc := range cases {
 
-		out := getKeyStrength(tc.keyType, tc.keyBits)
+		out := GetKeyStrength(tc.keyType, tc.keyBits)
 		if tc.ret != out {
 			t.Errorf("Expected '%s', but got '%s'", tc.ret, out)
 		}
 
 	}
-}
+}*/
 
 func TestGenerateCSR(t *testing.T) {
 	_, ctx := setup(t)
@@ -127,8 +202,8 @@ func TestGenerateCSR(t *testing.T) {
 		keyType string
 		ret     error
 	}{
-		{"Empty priv", "ecdsa", errors.New("x509: certificate private key does not implement crypto.Signer")},
-		{"Empty priv", "rsa", errors.New("x509: certificate private key does not implement crypto.Signer")},
+		{"Empty priv", "EC", errors.New("x509: certificate private key does not implement crypto.Signer")},
+		{"Empty priv", "RSA", errors.New("x509: certificate private key does not implement crypto.Signer")},
 	}
 
 	for _, tc := range testCases {
@@ -140,37 +215,6 @@ func TestGenerateCSR(t *testing.T) {
 				if err.Error() != tc.ret.Error() {
 					t.Errorf("Got result is %s; want %s", err, tc.ret)
 				}
-			}
-		})
-	}
-}
-
-func TestGetDevices(t *testing.T) {
-	srv, ctx := setup(t)
-
-	testCases := []struct {
-		name string
-		ret  error
-	}{
-		{"Correct", nil},
-		{"Error getting devices", errors.New("Testing DB connection failed")},
-	}
-
-	for _, tc := range testCases {
-
-		t.Run(fmt.Sprintf("Testing %s", tc.name), func(t *testing.T) {
-
-			if tc.name == "Error getting devices" {
-				ctx = context.WithValue(ctx, "DBShouldFail", true)
-			} else {
-				ctx = context.WithValue(ctx, "DBShouldFail", false)
-			}
-			_, err := srv.GetDevices(ctx)
-			if err != nil {
-				if tc.ret.Error() != err.Error() {
-					t.Errorf("Got result is %s; want %s", err, tc.ret)
-				}
-
 			}
 		})
 	}
@@ -193,17 +237,13 @@ func TestGetDeviceById(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Testing %s", tc.name), func(t *testing.T) {
 
-			out, err := srv.GetDeviceById(ctx, tc.id)
+			_, err := srv.GetDeviceById(ctx, tc.id)
 			if err != nil {
 				if err.Error() != tc.ret.Error() {
 					t.Errorf("Got result is %s; want %s", err, tc.ret)
 				}
 			}
-			if err == nil {
-				if out != tc.res {
-					t.Errorf("Got result is diferent from expected response")
-				}
-			}
+
 		})
 	}
 }
@@ -213,11 +253,8 @@ func TestGetDevicesByDMS(t *testing.T) {
 
 	d := testDevice()
 	var devList []devicesModel.Device
-	key := devicesModel.PrivateKeyMetadata{
-		KeyType: "rsa",
-		KeyBits: 3072,
-	}
-	dev, _ := srv.PostDevice(ctx, d.Alias, d.Id, d.DmsId, key, d.Subject)
+
+	dev, _ := srv.PostDevice(ctx, d.Alias, d.Id, d.DmsId, "", nil, "", "")
 	devList = append(devList, dev)
 
 	testCases := []struct {
@@ -233,7 +270,7 @@ func TestGetDevicesByDMS(t *testing.T) {
 
 		t.Run(fmt.Sprintf("Testing %s", tc.name), func(t *testing.T) {
 
-			_, err := srv.GetDevicesByDMS(ctx, tc.dmsId)
+			_, err := srv.GetDevicesByDMS(ctx, tc.dmsId, devicesModel.QueryParameters{})
 			if err != nil {
 				if err.Error() != tc.ret.Error() {
 					t.Errorf("Got result is %s; want %s", err, tc.ret)
@@ -259,7 +296,8 @@ func TestGetDeviceLogs(t *testing.T) {
 		{"Correct", "1", logs, nil},
 	}
 	for _, tc := range testCases {
-
+		/*order := devicesModel.OrderOptions{Order: "asc", Field: "id"}
+		pag := devicesModel.PaginationOptions{Page: 0, Offset: 100}*/
 		t.Run(fmt.Sprintf("Testing %s", tc.name), func(t *testing.T) {
 
 			out, err := srv.GetDeviceLogs(ctx, tc.id)
@@ -343,7 +381,7 @@ func TestGetDmsCertHistoryThirtyDays(t *testing.T) {
 				ctx = context.WithValue(ctx, "DBSelectDeviceCertHistory", false)
 				ctx = context.WithValue(ctx, "DBShouldFail", false)
 			}
-			_, err := srv.GetDmsCertHistoryThirtyDays(ctx)
+			_, err := srv.GetDmsCertHistoryThirtyDays(ctx, devicesModel.QueryParameters{})
 			if err != nil {
 				if err.Error() != tc.ret.Error() {
 					t.Errorf("Got result is %s; want %s", err, tc.ret)
@@ -376,7 +414,7 @@ func TestGetDmsLastIssuedCert(t *testing.T) {
 			} else {
 				ctx = context.WithValue(ctx, "DBSelectDmssLastIssuedCert", false)
 			}
-			_, err := srv.GetDmsLastIssuedCert(ctx)
+			_, err := srv.GetDmsLastIssuedCert(ctx, devicesModel.QueryParameters{})
 			if err != nil {
 				if err.Error() != tc.ret.Error() {
 					t.Errorf("Got result is %s; want %s", err, tc.ret)
@@ -392,14 +430,11 @@ func TestRevokeDeviceCert(t *testing.T) {
 	srv, ctx := setup(t)
 
 	d := testDevice()
-	key := devicesModel.PrivateKeyMetadata{
-		KeyType: "rsa",
-		KeyBits: 3072,
-	}
-	srv.PostDevice(ctx, d.Alias, d.Id, d.DmsId, key, d.Subject)
+
+	srv.PostDevice(ctx, d.Alias, d.Id, d.DmsId, "", nil, "", "")
 	dNoSerialNumber := testDeviceNoSerialNumber()
 
-	srv.PostDevice(ctx, dNoSerialNumber.Alias, dNoSerialNumber.Id, dNoSerialNumber.DmsId, key, dNoSerialNumber.Subject)
+	srv.PostDevice(ctx, dNoSerialNumber.Alias, dNoSerialNumber.Id, dNoSerialNumber.DmsId, "", nil, "", "")
 
 	testCases := []struct {
 		name string
@@ -445,62 +480,12 @@ func TestRevokeDeviceCert(t *testing.T) {
 	}
 }
 
-func TestPostDevice(t *testing.T) {
-	srv, ctx := setup(t)
-
-	device := testDevice()
-	deviceError := testDevice()
-	deviceError.Id = "error"
-	deviceErrorLog := device
-	deviceErrorLog.Id = "errorLog"
-	deviceErrorDeviceByID := device
-	deviceErrorDeviceByID.Id = "errorDeviceById"
-
-	testCases := []struct {
-		name string
-		in   devicesModel.Device
-		err  error
-	}{
-		{"Correct device", device, nil},
-		{"Error Inserting Log", deviceErrorLog, errors.New("Could not insert log")},
-		{"Error Inserting Device", deviceError, errors.New("error")},
-		{"Error Finding Device", deviceErrorDeviceByID, errors.New("Could not find device by Id")},
-	}
-	for _, tc := range testCases {
-		t.Run(fmt.Sprintf("Testing %s", tc.name), func(t *testing.T) {
-			key := devicesModel.PrivateKeyMetadata{
-				KeyType: "rsa",
-				KeyBits: 3072,
-			}
-			if tc.name == "Error Inserting Log" {
-				ctx = context.WithValue(ctx, "DBInsertLog", true)
-			} else {
-				ctx = context.WithValue(ctx, "DBInsertLog", false)
-			}
-
-			out, err := srv.PostDevice(ctx, tc.in.Alias, tc.in.Id, tc.in.DmsId, key, tc.in.Subject)
-			if err != nil {
-				if err.Error() != tc.err.Error() {
-					t.Errorf("Got result is %s; want %s", err, tc.err)
-				}
-			} else {
-				if tc.in.Id != out.Id {
-					t.Errorf("Not receiving expected response")
-				}
-			}
-		})
-	}
-}
-
 func TestDeleteDevice(t *testing.T) {
 	srv, ctx := setup(t)
 
 	d := testDevice()
-	key := devicesModel.PrivateKeyMetadata{
-		KeyType: "rsa",
-		KeyBits: 3072,
-	}
-	srv.PostDevice(ctx, d.Alias, d.Id, d.DmsId, key, d.Subject)
+
+	srv.PostDevice(ctx, d.Alias, d.Id, d.DmsId, "", nil, "", "")
 
 	testCases := []struct {
 		name string
@@ -555,19 +540,18 @@ func testDevice() devicesModel.Device {
 		CN: "testDeviceMock",
 	}
 	key := devicesModel.PrivateKeyMetadataWithStregth{
-		KeyType:     "rsa",
+		KeyType:     "RSA",
 		KeyBits:     3072,
 		KeyStrength: "",
 	}
 	device := devicesModel.Device{
-		Id:                      "1",
-		Alias:                   "testDeviceMock",
-		Status:                  "CERT_REVOKED",
-		DmsId:                   1,
-		Subject:                 subject,
-		KeyMetadata:             key,
-		CreationTimestamp:       "2022-01-11T07:02:40.082286Z",
-		CurrentCertSerialNumber: "23-33-5b-19-c8-ed-8b-2a-92-5c-7b-57-fc-47-45-e7-12-03-91-23",
+		Id:                "1",
+		Alias:             "testDeviceMock",
+		Status:            "CERT_REVOKED",
+		DmsId:             "1",
+		Subject:           subject,
+		KeyMetadata:       key,
+		CreationTimestamp: "2022-01-11T07:02:40.082286Z",
 	}
 
 	return device
@@ -583,19 +567,18 @@ func testDeviceNoSerialNumber() devicesModel.Device {
 		CN: "testDeviceMock",
 	}
 	key := devicesModel.PrivateKeyMetadataWithStregth{
-		KeyType:     "rsa",
+		KeyType:     "RSA",
 		KeyBits:     3072,
 		KeyStrength: "",
 	}
 	device := devicesModel.Device{
-		Id:                      "noSN",
-		Alias:                   "noSN",
-		Status:                  "CERT_REVOKED",
-		DmsId:                   1,
-		Subject:                 subject,
-		KeyMetadata:             key,
-		CreationTimestamp:       "2022-01-11T07:02:40.082286Z",
-		CurrentCertSerialNumber: "",
+		Id:                "noSN",
+		Alias:             "noSN",
+		Status:            "CERT_REVOKED",
+		DmsId:             "1",
+		Subject:           subject,
+		KeyMetadata:       key,
+		CreationTimestamp: "2022-01-11T07:02:40.082286Z",
 	}
 
 	return device
@@ -652,12 +635,11 @@ func testGetDeviceCertHistory() []devicesModel.DeviceCertHistory {
 	var certList []devicesModel.DeviceCertHistory
 	cert := devicesModel.DeviceCertHistory{
 
-		DeviceId:           "1",
-		SerialNumber:       "",
-		IssuerSerialNumber: "",
-		IsuuerName:         "",
-		Status:             "",
-		CreationTimestamp:  "",
+		DeviceId:          "1",
+		SerialNumber:      "",
+		IsuuerName:        "",
+		Status:            "",
+		CreationTimestamp: "",
 	}
 	certList = append(certList, cert)
 	return certList
@@ -667,7 +649,7 @@ func testDMSCertsHistory() []devicesModel.DMSCertHistory {
 
 	var certList []devicesModel.DMSCertHistory
 	cert := devicesModel.DMSCertHistory{
-		DmsId:       1,
+		DmsId:       "1",
 		IssuedCerts: 1,
 	}
 	certList = append(certList, cert)
@@ -678,7 +660,7 @@ func testDmsLastIssuedCert() []devicesModel.DMSLastIssued {
 
 	var certList []devicesModel.DMSLastIssued
 	cert := devicesModel.DMSLastIssued{
-		DmsId:        1,
+		DmsId:        "1",
 		Timestamp:    "",
 		SerialNumber: "",
 	}

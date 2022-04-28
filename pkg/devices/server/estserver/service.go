@@ -127,17 +127,19 @@ func (s *EstService) Enroll(ctx context.Context, csr *x509.CertificateRequest, a
 		return &x509.Certificate{}, &valError
 	}
 	deviceId = dataCert.Subject.CommonName
+	level.Debug(s.logger).Log("msg", csr.PublicKeyAlgorithm.String())
 	switch csr.PublicKeyAlgorithm.String() {
 	case "RSA":
 		PrivateKeyMetadataWithStregth.KeyType = "RSA"
 		rsaPublicKey := csr.PublicKey.(*rsa.PublicKey)
 		PrivateKeyMetadataWithStregth.KeyBits = rsaPublicKey.Size() * 8
-	case "EC":
+	case "ECDSA":
 		PrivateKeyMetadataWithStregth.KeyType = "EC"
 		ecPublicKey := csr.PublicKey.(*ecdsa.PublicKey)
 		PrivateKeyMetadataWithStregth.KeyBits = ecPublicKey.Curve.Params().BitSize
 	}
 	PrivateKeyMetadataWithStregth.KeyStrength = getKeyStrength(PrivateKeyMetadataWithStregth.KeyType, PrivateKeyMetadataWithStregth.KeyBits)
+	level.Debug(s.logger).Log("msg", PrivateKeyMetadataWithStregth)
 	subject := devicesModel.Subject{
 		CN: csr.Subject.CommonName,
 		O:  csr.Subject.Organization[0],
@@ -146,7 +148,7 @@ func (s *EstService) Enroll(ctx context.Context, csr *x509.CertificateRequest, a
 		ST: csr.Subject.Province[0],
 		L:  csr.Subject.Locality[0],
 	}
-	err = s.devicesDb.UpdateByID(ctx, subject.CN, subject.CN, dmsId, "", []string{}, "Cg/CgSmartphoneChip", "#0068D1")
+	err = s.devicesDb.SetKeyAndSubject(ctx, PrivateKeyMetadataWithStregth, subject, subject.CN)
 	if err != nil {
 		return nil, err
 	}

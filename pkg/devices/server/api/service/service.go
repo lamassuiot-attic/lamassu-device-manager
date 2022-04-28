@@ -278,8 +278,10 @@ func (s *devicesService) GetDeviceCertHistory(ctx context.Context, id string) ([
 		if err != nil {
 			return []devicesModel.DeviceCertHistory{}, err
 		}
-		t := time.Unix(cert.RevocationTimestamp, 0)
-		element.RevocationTimestamp = t.Format("2006-02-01 15:04:05")
+		if cert.RevocationTimestamp != 0 {
+			t := time.Unix(cert.RevocationTimestamp, 0)
+			element.RevocationTimestamp = t.Format("2006-01-02T15:04:05Z")
+		}
 		if err != nil {
 			return []devicesModel.DeviceCertHistory{}, err
 		} else {

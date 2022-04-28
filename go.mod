@@ -1,11 +1,6 @@
 module github.com/lamassuiot/lamassu-device-manager
 
 go 1.16
-
-// replace github.com/lamassuiot/lamassu-ca => /home/ikerlan/lamassu/lamassu-ca/
-
-// replace github.com/lamassuiot/lamassu-est => /home/ikerlan/lamassu/lamassu-est/
-
 require (
 	github.com/armon/go-metrics v0.3.10 // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -21,8 +16,8 @@ require (
 	github.com/hashicorp/consul/api v1.12.0
 	github.com/hashicorp/go-hclog v1.0.0 // indirect
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/lamassuiot/lamassu-ca v1.0.20
-	github.com/lamassuiot/lamassu-dms-enroller v0.0.24
+	github.com/lamassuiot/lamassu-ca v1.0.21
+	github.com/lamassuiot/lamassu-dms-enroller v0.0.25
 	github.com/lamassuiot/lamassu-est v0.2.7
 	github.com/lib/pq v1.10.3
 	github.com/mattn/go-colorable v0.1.11 // indirect

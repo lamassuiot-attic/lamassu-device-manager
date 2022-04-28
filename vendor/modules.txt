@@ -153,12 +153,12 @@ github.com/json-iterator/go
 # github.com/kelseyhightower/envconfig v1.4.0
 ## explicit
 github.com/kelseyhightower/envconfig
-# github.com/lamassuiot/lamassu-ca v1.0.20
+# github.com/lamassuiot/lamassu-ca v1.0.21
 ## explicit
 github.com/lamassuiot/lamassu-ca/pkg/client
 github.com/lamassuiot/lamassu-ca/pkg/server/secrets
 github.com/lamassuiot/lamassu-ca/pkg/server/utils
-# github.com/lamassuiot/lamassu-dms-enroller v0.0.24
+# github.com/lamassuiot/lamassu-dms-enroller v0.0.25
 ## explicit
 github.com/lamassuiot/lamassu-dms-enroller/pkg/server/models/dms
 # github.com/lamassuiot/lamassu-est v0.2.7
